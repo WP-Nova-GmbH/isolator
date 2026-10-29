@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: isolator-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: isolator
+      POSTGRES_PASSWORD: isolator
+      POSTGRES_DB: isolator
+    ports:
+      # 5440 on the host to avoid clashing with other local Postgres instances.
+      - "5440:5432"
+    volumes:
+      - isolator_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U isolator -d isolator"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  isolator_pgdata:

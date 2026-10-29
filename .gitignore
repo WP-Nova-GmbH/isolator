@@ -1,0 +1,22 @@
+# dependencies
+node_modules/
+
+# env files (keep the examples)
+.env
+.env.*
+!.env.example
+
+# build output
+dist/
+build/
+coverage/
+.react-router/
+.expo/
+
+# misc
+.DS_Store
+*.log
+
+# Claude Code local permissions
+.claude/settings.local.json
+*.tsbuildinfo
