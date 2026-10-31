@@ -10,7 +10,7 @@ Use the terms in [GLOSSARY.md](GLOSSARY.md). Record decisions that are hard to r
 
 ## ISO content
 
-Never reproduce ISO/IEC 27001 or 27002 control text: it is copyrighted. Control references and titles are fine; descriptions and guidance must be our own wording.
+Never reproduce ISO/IEC 27001 or 27002 control text: it is copyrighted. Control references and English titles are fine, but they are excluded from the MIT licence. German and French titles, descriptions and guidance must be our own wording, not taken from national editions.
 
 ## Data
 
