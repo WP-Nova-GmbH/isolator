@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Isolator">
+  <title>Isolator</title>
+  <rect width="32" height="32" rx="7" fill="#1A2124"/>
+  <g transform="translate(4 4) scale(0.75)">
+  <g fill="none" stroke="#FFFFFF" stroke-width="5">
+    <path d="M4.5 11V4.5H11M21 4.5H27.5V11M27.5 21V27.5H21M11 27.5H4.5V21"/>
+  </g>
+  <rect x="13.25" y="14.5" width="5.5" height="10.5" fill="#FFFFFF"/>
+  <rect x="13.25" y="7" width="5.5" height="5.5" fill="#3BBDB0"/>
+  </g>
+</svg>

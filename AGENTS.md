@@ -15,3 +15,7 @@ Never reproduce ISO/IEC 27001 or 27002 control text: it is copyrighted. Control 
 ## Data
 
 Every customer-owned table carries `organization_id` and every query on it must be scoped by it. The control catalog (`controls`) is the only global table.
+
+## UI
+
+Follow [docs/design-system.md](docs/design-system.md). Components use the semantic tokens from `apps/web/src/index.css` (`bg-surface`, `text-muted-foreground`, `bg-risk-high`); Tailwind's default palette is off. Logo artwork is in `docs/brand/`; never redraw it.

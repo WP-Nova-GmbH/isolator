@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Isolator">
+  <title>Isolator</title>
+  <g fill="none" stroke="#F4F6F6" stroke-width="4">
+    <path d="M4.0 11V4.0H11M21 4.0H28.0V11M28.0 21V28.0H21M11 28.0H4.0V21"/>
+  </g>
+  <rect x="13.25" y="14.5" width="5.5" height="10.5" fill="#F4F6F6"/>
+  <rect x="13.25" y="7" width="5.5" height="5.5" fill="#3BBDB0"/>
+</svg>

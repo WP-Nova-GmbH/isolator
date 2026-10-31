@@ -1,1 +1,226 @@
 @import 'tailwindcss';
+/* Self-hosted fonts: no request to Google from the customer's browser (GDPR). */
+@import '@fontsource-variable/instrument-sans';
+@import '@fontsource-variable/archivo/wdth.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
+/*
+ * Isolator design tokens. See docs/design-system.md.
+ *
+ * Layer 1, primitives: the only raw colours in the app. Tailwind's default
+ * palette is switched off so `bg-slate-*` and friends don't creep back in.
+ */
+@theme {
+  --color-*: initial;
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  /* Ink: cool neutrals with a slight glass bias. */
+  --color-ink-25: #fafbfb;
+  --color-ink-50: #f4f6f6;
+  --color-ink-100: #e8ecec;
+  --color-ink-200: #d4dbdb;
+  --color-ink-300: #b3bebf;
+  --color-ink-400: #8a9799;
+  --color-ink-500: #67767a;
+  --color-ink-600: #4f5d61;
+  --color-ink-700: #3d484c;
+  --color-ink-800: #2a3336;
+  --color-ink-900: #1a2124;
+  --color-ink-950: #0f1416;
+
+  /* Glass: the brand colour, after aqua glass line insulators. */
+  --color-glass-50: #eefbf9;
+  --color-glass-100: #d3f4ef;
+  --color-glass-200: #a8e8df;
+  --color-glass-300: #72d6ca;
+  --color-glass-400: #3bbdb0;
+  --color-glass-500: #179f94;
+  --color-glass-600: #0c8078;
+  --color-glass-700: #0d6762;
+  --color-glass-800: #0f524f;
+  --color-glass-900: #0f4442;
+  --color-glass-950: #052928;
+
+  --font-sans: 'Instrument Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Archivo Variable', 'Instrument Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+/*
+ * Layer 2, semantic: what components use. Light values on :root, dark values
+ * follow the OS unless `data-theme` on <html> pins one.
+ */
+:root {
+  --background: var(--color-ink-25);
+  --foreground: var(--color-ink-900);
+  --surface: var(--color-white);
+  --surface-sunken: var(--color-ink-50);
+  --muted-foreground: var(--color-ink-600);
+  --border: var(--color-ink-200);
+  --border-strong: var(--color-ink-300);
+  --primary: var(--color-glass-700);
+  --primary-hover: var(--color-glass-800);
+  --primary-foreground: var(--color-white);
+  --selected: var(--color-glass-50);
+  --selected-foreground: var(--color-glass-800);
+  --ring: var(--color-glass-500);
+  --brand-dot: var(--color-glass-500);
+
+  /* Status tones for badges and inline messages. */
+  --success: #2f7a2a;
+  --success-subtle: #e6f2e1;
+  --success-foreground: #24571f;
+  --warning: #b7820f;
+  --warning-subtle: #fbf0d2;
+  --warning-foreground: #6b4a00;
+  --info: #2c67b0;
+  --info-subtle: #e2ecf8;
+  --info-foreground: #1e4e8c;
+  --danger: #b0233a;
+  --danger-subtle: #fadde0;
+  --danger-foreground: #8e1426;
+  --neutral-subtle: var(--color-ink-100);
+  --neutral-foreground: var(--color-ink-700);
+
+  /* Risk bands for likelihood × impact (1–25). Solid fills are for matrix cells. */
+  --risk-low: #377d30;
+  --risk-low-on: var(--color-white);
+  --risk-medium: #e3ae2b;
+  --risk-medium-on: var(--color-ink-900);
+  --risk-high: #bc4a17;
+  --risk-high-on: var(--color-white);
+  --risk-critical: #b0233a;
+  --risk-critical-on: var(--color-white);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --background: var(--color-ink-950);
+    --foreground: var(--color-ink-50);
+    --surface: var(--color-ink-900);
+    --surface-sunken: #151b1d;
+    --muted-foreground: var(--color-ink-400);
+    --border: var(--color-ink-800);
+    --border-strong: var(--color-ink-700);
+    --primary: var(--color-glass-400);
+    --primary-hover: var(--color-glass-300);
+    --primary-foreground: var(--color-glass-950);
+    --selected: #0d2725;
+    --selected-foreground: var(--color-glass-200);
+    --ring: var(--color-glass-400);
+    --brand-dot: var(--color-glass-400);
+    --success: #6fbf63;
+    --success-subtle: #16261a;
+    --success-foreground: #a9d79e;
+    --warning: #e9b949;
+    --warning-subtle: #2a2210;
+    --warning-foreground: #f2cf72;
+    --info: #6aa5e8;
+    --info-subtle: #14202f;
+    --info-foreground: #9cc2f0;
+    --danger: #f2808e;
+    --danger-subtle: #2f1519;
+    --danger-foreground: #f49aa5;
+    --neutral-subtle: #222a2d;
+    --neutral-foreground: var(--color-ink-300);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --background: var(--color-ink-950);
+  --foreground: var(--color-ink-50);
+  --surface: var(--color-ink-900);
+  --surface-sunken: #151b1d;
+  --muted-foreground: var(--color-ink-400);
+  --border: var(--color-ink-800);
+  --border-strong: var(--color-ink-700);
+  --primary: var(--color-glass-400);
+  --primary-hover: var(--color-glass-300);
+  --primary-foreground: var(--color-glass-950);
+  --selected: #0d2725;
+  --selected-foreground: var(--color-glass-200);
+  --ring: var(--color-glass-400);
+  --brand-dot: var(--color-glass-400);
+  --success: #6fbf63;
+  --success-subtle: #16261a;
+  --success-foreground: #a9d79e;
+  --warning: #e9b949;
+  --warning-subtle: #2a2210;
+  --warning-foreground: #f2cf72;
+  --info: #6aa5e8;
+  --info-subtle: #14202f;
+  --info-foreground: #9cc2f0;
+  --danger: #f2808e;
+  --danger-subtle: #2f1519;
+  --danger-foreground: #f49aa5;
+  --neutral-subtle: #222a2d;
+  --neutral-foreground: var(--color-ink-300);
+  color-scheme: dark;
+}
+
+/* Expose the semantic layer as Tailwind utilities: bg-surface, text-muted-foreground, … */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-selected: var(--selected);
+  --color-selected-foreground: var(--selected-foreground);
+  --color-ring: var(--ring);
+  --color-brand-dot: var(--brand-dot);
+  --color-success: var(--success);
+  --color-success-subtle: var(--success-subtle);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-subtle: var(--info-subtle);
+  --color-info-foreground: var(--info-foreground);
+  --color-danger: var(--danger);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-neutral-subtle: var(--neutral-subtle);
+  --color-neutral-foreground: var(--neutral-foreground);
+  --color-risk-low: var(--risk-low);
+  --color-risk-low-on: var(--risk-low-on);
+  --color-risk-medium: var(--risk-medium);
+  --color-risk-medium-on: var(--risk-medium-on);
+  --color-risk-high: var(--risk-high);
+  --color-risk-high-on: var(--risk-high-on);
+  --color-risk-critical: var(--risk-critical);
+  --color-risk-critical-on: var(--risk-critical-on);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  body {
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-stretch: 112.5%;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+}

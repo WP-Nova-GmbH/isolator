@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router';
+import { Logo } from '../components/logo';
 
 const nav = [
   { to: '/', label: 'Overview' },
@@ -7,9 +8,9 @@ const nav = [
 
 export function Layout() {
   return (
-    <div className="flex min-h-screen bg-slate-50 text-slate-900">
-      <aside className="w-56 border-r border-slate-200 bg-white p-4">
-        <div className="mb-6 text-lg font-semibold">Isolator</div>
+    <div className="flex min-h-screen">
+      <aside className="w-56 border-r bg-surface p-4">
+        <Logo className="mb-8 ml-3 mt-1 h-6 w-auto" />
         <nav className="flex flex-col gap-1">
           {nav.map((item) => (
             <NavLink
@@ -17,7 +18,7 @@ export function Layout() {
               to={item.to}
               end
               className={({ isActive }) =>
-                `rounded px-3 py-2 text-sm ${isActive ? 'bg-slate-900 text-white' : 'hover:bg-slate-100'}`
+                `rounded-md px-3 py-2 text-sm ${isActive ? 'bg-selected font-medium text-selected-foreground' : 'text-muted-foreground hover:bg-surface-sunken hover:text-foreground'}`
               }
             >
               {item.label}
