@@ -1,6 +1,6 @@
 # Isolator
 
-Platform that carries a business through its ISO/IEC 27001:2022 transition and keeps the ISMS running afterwards: risk management, automated system scans, AI-assisted recurring risk assessments, and certification-audit preparation.
+Self-hosted ISMS for mid-sized businesses going for their first ISO/IEC 27001:2022 certificate and keeping it afterwards: risks, assets, suppliers, the Statement of Applicability, documents, evidence and audit preparation. Every step works by hand, and automated scans and AI come later.
 
 See [docs/roadmap.md](docs/roadmap.md) for scope and phases, [CONTEXT.md](CONTEXT.md) for domain context, [docs/design-system.md](docs/design-system.md) for the logo, tokens and UI rules.
 
@@ -26,3 +26,7 @@ npm run dev           # api on :3000, web on :5173 (proxies /api)
 ```
 
 Schema changes: edit `apps/api/src/db/schema.ts`, then `npm run db:generate` and `npm run db:migrate`.
+
+## License
+
+MIT, see [LICENSE](LICENSE). ISO control references and English control titles are excluded.
