@@ -2,7 +2,7 @@
 
 Isolator is used by the person who carries an ISMS: often an IT lead or office manager doing security on the side, sometimes a consultant or an auditor looking over their shoulder. The interface should feel like a well-kept audit file: calm, exact, and easy to defend. Nothing decorative competes with the state of a control or a risk.
 
-Tokens live in [apps/web/src/index.css](../apps/web/src/index.css). Logo artwork lives in [docs/brand/](brand/). Components that encode the rules below live in [apps/web/src/components/](../apps/web/src/components/).
+Tokens live in [apps/web/src/index.css](../apps/web/src/index.css). Logo artwork lives in [docs/brand/](brand/). Components are [shadcn/ui](https://ui.shadcn.com) on Radix, restyled to these rules, in [apps/web/src/components/ui/](../apps/web/src/components/ui/); our own components sit one level up in [apps/web/src/components/](../apps/web/src/components/).
 
 ## Logo
 
@@ -102,16 +102,34 @@ Scale, using Tailwind's defaults: page title `text-2xl`, section `text-lg`, body
 
 ## Components
 
+Base components live in `components/ui/`. They started as stock shadcn and are ours to edit. Our own components, which know about the domain, sit in `components/` and build on them.
+
 | Component | File | Notes |
 | --- | --- | --- |
+| `Button` | `ui/button.tsx` | `default` once per view; `outline` for other actions; `secondary`, `ghost` and `link` where a border is noise; `destructive` for deleting. 36 px tall by default |
+| `Badge` | `ui/badge.tsx` | `variant` is a tone: `neutral`, `success`, `warning`, `info`, `danger`. Always has a text label |
+| `Table` | `ui/table.tsx` | Registers. Wrap it in `rounded-md border bg-card` |
+| `Alert` | `ui/alert.tsx` | `destructive` for load failures and blocking errors |
+| `Skeleton` | `ui/skeleton.tsx` | Loading states. The pulse stops under `prefers-reduced-motion` |
+| `Sidebar` | `ui/sidebar.tsx` | App shell. A 224 px rail on desktop, a sheet on phones |
+| `Input` | `ui/input.tsx` | Comes with `Sidebar`; 36 px tall to line up with `Button` |
 | `Logo`, `Mark` | `logo.tsx` | Theme-aware SVG |
-| `Button` | `button.tsx` | `primary` once per view, `secondary`, `ghost`, `danger` |
-| `Badge` | `badge.tsx` | Takes a `tone`; always has a text label |
-| `RiskScore`, `riskBand` | `risk-score.tsx` | Score chip coloured by band |
+| `RiskScore`, `riskBand` | `risk-score.tsx` | `Badge` filled with the risk band |
+
+`Sheet`, `Separator` and `Tooltip` are installed as parts of `Sidebar`. Icons are [Lucide](https://lucide.dev): 16 px beside text, in `currentColor`.
+
+### Adding shadcn components
+
+Run `npx shadcn@latest add <component>` from `apps/web`, then review the diff before keeping it:
+
+1. **Check `index.css`.** The CLI can write its own colours into the file. Stock values must not stay: `init` replaced our tokens with neutral greys when we first ran it, so don't run it again.
+2. **Map new tokens.** shadcn's names (`card`, `muted`, `accent`, `destructive`, `input`, `sidebar-*`) are aliases of ours in the "shadcn aliases" block. A new one goes there too, pointing at a semantic token, with no dark value of its own.
+3. **Fix focus.** Replace `outline-none`, `outline-hidden` and `focus-visible:ring-*` with `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`. Leaving `outline-hidden` in place hides the focus outline entirely.
+4. **Bring the shape in line.** Buttons, inputs and cards take `rounded-md`, badges `rounded-sm`, menus and dialogs `rounded-lg`. Hover uses `bg-muted`; the glass tint in `accent` is for selected things. Remove translate and scale effects.
 
 ## Dark mode
 
-Dark values follow the OS. Setting `data-theme="light"` or `data-theme="dark"` on `<html>` pins one. Because components only use semantic tokens, they don't need `dark:` variants.
+Dark values follow the OS. Setting `data-theme="light"` or `data-theme="dark"` on `<html>` pins one. Our tokens already switch, so don't write `dark:` variants. The `dark:` variant stays defined with the same rule for the ones that come with stock shadcn components.
 
 ## Voice
 

@@ -8,7 +8,7 @@ See [docs/roadmap.md](docs/roadmap.md) for scope and phases, [CONTEXT.md](CONTEX
 
 ```
 apps/api   NestJS + Drizzle + Postgres
-apps/web   React + Vite + React Router + Tailwind
+apps/web   React + Vite + React Router + Tailwind + shadcn/ui
 packages/  shared code (empty for now)
 docs/adr   architecture decision records
 ```

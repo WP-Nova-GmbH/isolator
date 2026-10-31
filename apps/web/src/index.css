@@ -1,9 +1,23 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 /* Self-hosted fonts: no request to Google from the customer's browser (GDPR). */
 @import '@fontsource-variable/instrument-sans';
 @import '@fontsource-variable/archivo/wdth.css';
 @import '@fontsource/ibm-plex-mono/400.css';
 @import '@fontsource/ibm-plex-mono/500.css';
+
+/* Same rule as the dark tokens below: the OS decides unless data-theme pins a theme. */
+@custom-variant dark {
+  &:where([data-theme='dark'], [data-theme='dark'] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme='light']), :root:not([data-theme='light']) *) {
+      @slot;
+    }
+  }
+}
 
 /*
  * Isolator design tokens. See docs/design-system.md.
@@ -46,6 +60,11 @@
   --font-sans: 'Instrument Sans Variable', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Archivo Variable', 'Instrument Sans Variable', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-heading: var(--font-display);
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
 }
 
 /*
@@ -93,6 +112,32 @@
   --risk-high-on: var(--color-white);
   --risk-critical: #b0233a;
   --risk-critical-on: var(--color-white);
+}
+
+/*
+ * Layer 3, shadcn aliases: the names components in components/ui expect. They
+ * point at the semantic layer, so they have no dark values of their own.
+ */
+:root {
+  --card: var(--surface);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface);
+  --popover-foreground: var(--foreground);
+  --secondary: var(--surface-sunken);
+  --secondary-foreground: var(--foreground);
+  --muted: var(--surface-sunken);
+  --accent: var(--selected);
+  --accent-foreground: var(--selected-foreground);
+  --destructive: var(--danger);
+  --input: var(--border-strong);
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--muted-foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--selected);
+  --sidebar-accent-foreground: var(--selected-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -199,6 +244,25 @@
   --color-risk-high-on: var(--risk-high-on);
   --color-risk-critical: var(--risk-critical);
   --color-risk-critical-on: var(--risk-critical-on);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-input: var(--input);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 }
 
 @layer base {

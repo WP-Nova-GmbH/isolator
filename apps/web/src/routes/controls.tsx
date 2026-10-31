@@ -1,4 +1,15 @@
 import { useEffect, useState } from 'react';
+import { CircleAlertIcon } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 interface Control {
   id: string;
@@ -21,27 +32,41 @@ export function Controls() {
   return (
     <div>
       <h1 className="text-2xl font-semibold">Annex A controls</h1>
-      {error && <p className="mt-4 text-danger">Failed to load controls: {error}</p>}
-      {!controls && !error && <p className="mt-4 text-muted-foreground">Loading…</p>}
+      {error && (
+        <Alert variant="destructive" className="mt-6">
+          <CircleAlertIcon />
+          <AlertTitle>Controls didn't load</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      {!controls && !error && (
+        <div className="mt-6 flex flex-col gap-2" aria-label="Loading controls">
+          <Skeleton className="h-9" />
+          <Skeleton className="h-9" />
+          <Skeleton className="h-9" />
+        </div>
+      )}
       {controls && (
-        <table className="mt-6 w-full border-collapse bg-surface text-sm">
-          <thead>
-            <tr className="border-b text-left text-muted-foreground">
-              <th className="p-2">Ref</th>
-              <th className="p-2">Title</th>
-              <th className="p-2">Theme</th>
-            </tr>
-          </thead>
-          <tbody>
-            {controls.map((c) => (
-              <tr key={c.id} className="border-b">
-                <td className="p-2 font-mono text-muted-foreground">{c.ref}</td>
-                <td className="p-2">{c.title}</td>
-                <td className="p-2 capitalize">{c.theme}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="mt-6 rounded-md border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Ref</TableHead>
+                <TableHead>Title</TableHead>
+                <TableHead>Theme</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {controls.map((c) => (
+                <TableRow key={c.id}>
+                  <TableCell className="font-mono text-muted-foreground">{c.ref}</TableCell>
+                  <TableCell>{c.title}</TableCell>
+                  <TableCell className="capitalize">{c.theme}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
     </div>
   );
