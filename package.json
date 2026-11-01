@@ -25,9 +25,11 @@
     "db:seed": "npm run db:seed -w api",
     "db:seed:dev": "npm run db:seed:dev -w api",
     "db:studio": "npm run db:studio -w api",
+    "release": "wersion",
     "create-docker-image": "node scripts/create-and-push-image.mts"
   },
   "devDependencies": {
+    "@weichwarenprojekt/wersion": "1.7.0",
     "concurrently": "^10.0.6"
   }
 }

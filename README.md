@@ -58,7 +58,13 @@ npm run create-docker-image             # for this machine, to try it locally
 npm run create-docker-image -- --push   # publishes amd64 and arm64
 ```
 
-The image is tagged `latest` and with `version` from `package.json`. Publishing the same version again replaces it, so run `npm version patch` first.
+The image is tagged `latest` and with `version` from `package.json`. Publishing the same version again replaces it, so release a new version first:
+
+```sh
+npm run release   # bumps the version, updates CHANGELOG.md, commits and tags it
+```
+
+Commits since the last `isolator-*` tag set the version: `fix` raises the patch version, `feat` the minor version, and "breaking change" in a commit body the major version. Other types don't start a release. Use `npm run release -- --releaseAs=patch` to choose, or `--dry-run` to see what it would do.
 
 To run it, put the settings in a file. `BETTER_AUTH_URL` is the address people open Isolator at, and changing `BETTER_AUTH_SECRET` signs everyone out. [.env.example](apps/api/.env.example) lists the optional S3 and ClamAV settings.
 
