@@ -5,6 +5,7 @@ Isolator has to carry an ISMS from nothing to a certificate and beyond. The phas
 ## Phase 1 – Foundations
 
 - [x] Annex A 2022 control catalog
+- [x] Production image: one container for the API and web app, with Postgres outside it
 - [ ] Docker Compose stack for self-hosting
 - [x] File storage: on local disk, or in S3 when configured
 - [x] Claiming an install, sign-in and invitations (better-auth)

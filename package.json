@@ -1,5 +1,6 @@
 {
   "name": "isolator",
+  "version": "0.1.0",
   "private": true,
   "license": "MIT",
   "workspaces": [
@@ -23,7 +24,8 @@
     "db:migrate": "npm run db:migrate -w api",
     "db:seed": "npm run db:seed -w api",
     "db:seed:dev": "npm run db:seed:dev -w api",
-    "db:studio": "npm run db:studio -w api"
+    "db:studio": "npm run db:studio -w api",
+    "create-docker-image": "node scripts/create-and-push-image.mts"
   },
   "devDependencies": {
     "concurrently": "^10.0.6"

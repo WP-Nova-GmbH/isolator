@@ -16,5 +16,6 @@ Isolator ships as one Docker Compose stack with no required outside service, and
 - Keeping auth secure is our job, including getting fixes onto self-hosted installs.
 - Anything added later, such as file storage, email or AI, must be optional or run inside the stack. Files go to the local disk unless `S3_BUCKET` is set, so S3 stays optional.
 - Tenancy by `organization_id` stays, so an install can hold one Organization or several.
+- One image holds the API and the web app. Postgres runs outside it, in the stack's own container or on a separate server.
 - Claiming needs no email or outside service: the API prints a setup token to its logs, so whoever can read the server's logs can claim the install. The database allows one Operator.
 - The stack sends no email, so sign-up stays closed. Accounts come from claiming or from an invitation link someone passes on, and a forgotten password is reset on the server. The link is good for one use and we keep only its hash.

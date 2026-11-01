@@ -40,13 +40,50 @@ To scan uploads for viruses, set `CLAMAV_HOST`. Isolator then refuses an infecte
 
 A new install has nobody to sign in as, so the app opens on Claim. The setup token for it is in the API's logs, and it changes each time the API starts. Whoever claims the install becomes its Operator and creates its Organizations.
 
-In production, set `BETTER_AUTH_URL` to the address people open Isolator at and `BETTER_AUTH_SECRET` to `openssl rand -base64 32`, and serve the web app and `/api` from that one address, because sign-in uses a cookie. See [ADR 0004](docs/adr/0004-self-hostable-with-own-auth.md).
-
 Isolator sends no email. Invitations are links you pass on yourself, and whoever runs the server resets a forgotten password:
 
 ```sh
 npm run auth:reset-password -w api -- someone@example.com
 ```
+
+## Production
+
+One container serves the API and the web app on port 3000, so both share an address, which sign-in needs because it uses a cookie. Postgres runs outside the container.
+
+Build the image, then publish it to the registry set in `scripts/.env`:
+
+```sh
+cp scripts/.env.example scripts/.env
+npm run create-docker-image             # for this machine, to try it locally
+npm run create-docker-image -- --push   # publishes amd64 and arm64
+```
+
+The image is tagged `latest` and with `version` from `package.json`. Publishing the same version again replaces it, so run `npm version patch` first.
+
+To run it, put the settings in a file. `BETTER_AUTH_URL` is the address people open Isolator at, and changing `BETTER_AUTH_SECRET` signs everyone out. [.env.example](apps/api/.env.example) lists the optional S3 and ClamAV settings.
+
+```sh
+# isolator.env
+DATABASE_URL=postgres://isolator:password@db.example.com:5432/isolator?sslmode=require
+BETTER_AUTH_URL=https://isolator.example.com
+BETTER_AUTH_SECRET=   # openssl rand -base64 32
+```
+
+```sh
+docker run -d --name isolator --restart unless-stopped \
+  --env-file isolator.env \
+  -p 127.0.0.1:3000:3000 \
+  -v isolator_storage:/data/storage \
+  wp-containerz.cr.de-fra.ionos.com/isolator:0.1.0
+```
+
+- Put it behind a proxy that handles HTTPS and sets `X-Forwarded-For`, which the sign-in rate limit reads.
+- Each start migrates the database and loads the control catalog before the API starts. Run one container at a time.
+- Uploads stay in `/data/storage`, so keep that volume and back it up, or set `S3_BUCKET`.
+- `docker logs isolator` shows the setup token until the install is claimed.
+- To reset a password: `docker exec isolator node dist/src/auth/reset-password.js someone@example.com`
+
+See [ADR 0004](docs/adr/0004-self-hostable-with-own-auth.md).
 
 ## License
 
