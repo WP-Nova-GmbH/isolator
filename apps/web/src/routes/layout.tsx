@@ -1,9 +1,29 @@
-import { NavLink, Outlet, useLocation } from 'react-router';
+import {
+  ArchiveIcon,
+  BoxIcon,
+  Building2Icon,
+  ChevronsUpDownIcon,
+  CircleCheckIcon,
+  FileTextIcon,
+  FlagIcon,
+  LayoutDashboardIcon,
+  ListChecksIcon,
+  PaperclipIcon,
+  ScrollTextIcon,
+  SirenIcon,
+  TriangleAlertIcon,
+  UsersIcon,
+} from 'lucide-react';
+import { Form, Link, NavLink, Outlet, useLocation } from 'react-router';
 import { Logo, Mark } from '@/components/logo';
+import { Button } from '@/components/ui/button';
+import { NativeSelect } from '@/components/ui/native-select';
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -13,36 +33,118 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { useAppData } from '@/lib/members';
 
-const nav = [
-  { to: '/', label: 'Overview' },
-  { to: '/controls', label: 'Controls' },
+const navGroups = [
+  {
+    items: [
+      { to: '/', label: 'Overview', icon: LayoutDashboardIcon },
+      { to: '/tasks', label: 'Tasks', icon: CircleCheckIcon },
+    ],
+  },
+  {
+    label: 'ISMS',
+    items: [
+      { to: '/soa', label: 'Statement of Applicability', icon: ListChecksIcon },
+      { to: '/risks', label: 'Risks', icon: TriangleAlertIcon },
+      { to: '/assets', label: 'Assets', icon: BoxIcon },
+      { to: '/suppliers', label: 'Suppliers', icon: Building2Icon },
+      { to: '/evidence', label: 'Evidence', icon: PaperclipIcon },
+      { to: '/incidents', label: 'Incidents', icon: SirenIcon },
+      { to: '/nonconformities', label: 'Nonconformities', icon: FlagIcon },
+      { to: '/documents', label: 'Documents', icon: FileTextIcon },
+    ],
+  },
+  {
+    label: 'Certification',
+    items: [
+      { to: '/audit-file', label: 'Audit file', icon: ArchiveIcon },
+      { to: '/audit-trail', label: 'Audit trail', icon: ScrollTextIcon },
+    ],
+  },
+  {
+    label: 'Organization',
+    items: [{ to: '/members', label: 'Members and settings', icon: UsersIcon }],
+  },
 ];
+
+function initials(name: string) {
+  return name
+    .split(' ')
+    .map((part) => part[0])
+    .join('');
+}
 
 function AppSidebar() {
   const { pathname } = useLocation();
   const { setOpenMobile } = useSidebar();
+  const { me } = useAppData();
 
   return (
-    <Sidebar>
-      <SidebarHeader className="px-5 pt-5 pb-4 text-foreground">
-        <Logo className="h-6 w-auto self-start" />
+    <Sidebar variant="inset">
+      <SidebarHeader className="gap-3 px-0.5 pt-2 pb-0">
+        <Link to="/" aria-label="Isolator overview" className="px-2 py-1 text-foreground">
+          <Logo className="h-5.5 w-auto" />
+        </Link>
+        <Link
+          to="/organizations"
+          aria-label={`${me.organizationName}, switch Organization`}
+          className="flex items-center gap-2 rounded-md border bg-surface px-2 py-1.5 font-medium text-foreground shadow-xs hover:border-border-strong"
+        >
+          <span className="grid size-5 shrink-0 place-items-center rounded-[0.3125rem] bg-foreground text-[0.6875rem] leading-none font-semibold text-surface">
+            {me.organizationName[0]}
+          </span>
+          <span className="min-w-0 flex-1 truncate">{me.organizationName}</span>
+          <ChevronsUpDownIcon className="size-4 shrink-0 text-muted-foreground" />
+        </Link>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarMenu>
-            {nav.map((item) => (
-              <SidebarMenuItem key={item.to}>
-                <SidebarMenuButton asChild isActive={pathname === item.to}>
-                  <NavLink to={item.to} end onClick={() => setOpenMobile(false)}>
-                    {item.label}
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarGroup>
+        {navGroups.map((group) => (
+          <SidebarGroup key={group.label ?? 'main'} className="px-0.5 py-1">
+            {group.label && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
+            <SidebarMenu className="gap-px">
+              {group.items.map((item) => (
+                <SidebarMenuItem key={item.to}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={item.to === '/' ? pathname === '/' : pathname.startsWith(item.to)}
+                  >
+                    <NavLink
+                      to={item.to}
+                      end={item.to === '/'}
+                      onClick={() => setOpenMobile(false)}
+                    >
+                      <item.icon strokeWidth={1.75} />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
+      <SidebarFooter className="gap-2 px-2.5 pb-3">
+        <div className="flex items-center gap-2 border-t pt-3 font-medium text-foreground">
+          <span className="grid size-6 shrink-0 place-items-center rounded-full bg-selected text-[0.6875rem] leading-none font-semibold text-selected-foreground">
+            {initials(me.name)}
+          </span>
+          <span className="min-w-0 flex-1 truncate">{me.name}</span>
+          <Form method="post" action="/sign-out">
+            <Button type="submit" variant="ghost" size="xs">
+              Sign out
+            </Button>
+          </Form>
+        </div>
+        <label className="sr-only" htmlFor="language">
+          Language
+        </label>
+        <NativeSelect id="language" className="h-8 bg-transparent shadow-none">
+          <option>English</option>
+          <option>Deutsch</option>
+          <option>Français</option>
+        </NativeSelect>
+      </SidebarFooter>
     </Sidebar>
   );
 }
@@ -52,11 +154,11 @@ export function Layout() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-12 items-center gap-2 border-b bg-card px-2 md:hidden">
+        <header className="flex h-12 items-center gap-2 border-b px-2 md:hidden">
           <SidebarTrigger />
           <Mark className="size-5" />
         </header>
-        <div className="flex-1 p-4 md:p-8">
+        <div className="flex flex-1 flex-col gap-6 px-4 py-5 md:px-9 md:pt-7 md:pb-9">
           <Outlet />
         </div>
       </SidebarInset>

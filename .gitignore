@@ -13,6 +13,9 @@ coverage/
 .react-router/
 .expo/
 
+# uploaded files in development
+apps/api/storage/
+
 # misc
 .DS_Store
 *.log

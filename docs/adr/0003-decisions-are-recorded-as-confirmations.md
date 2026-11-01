@@ -18,3 +18,4 @@ We rejected recording only AI-drafted decisions, because it leaves hand-entered 
 - People in an Organization and the Confirmation record have to exist before SoA and risk features are built on these tables.
 - Saving a decision adds to its history instead of overwriting it.
 - A drafted value nobody has confirmed stays visibly unconfirmed.
+- Confirmations are entries in the Audit trail, see [ADR 0005](0005-append-only-audit-trail.md).

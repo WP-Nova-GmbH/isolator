@@ -22,6 +22,7 @@
     "db:generate": "npm run db:generate -w api",
     "db:migrate": "npm run db:migrate -w api",
     "db:seed": "npm run db:seed -w api",
+    "db:seed:dev": "npm run db:seed:dev -w api",
     "db:studio": "npm run db:studio -w api"
   },
   "devDependencies": {

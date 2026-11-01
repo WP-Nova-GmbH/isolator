@@ -4,15 +4,15 @@ import { cn } from "cn"
 import { Slot } from "radix-ui"
 
 const badgeVariants = cva(
-  "group/badge inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-sm border border-transparent px-1.5 py-0.5 text-xs font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3!",
+  "group/badge inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1.5 overflow-hidden rounded-full pr-2 pl-[7px] text-xs font-medium whitespace-nowrap text-foreground ring-1 ring-border ring-inset transition-colors before:size-1.5 before:shrink-0 before:rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&>svg]:pointer-events-none [&>svg]:size-3!",
   {
     variants: {
       variant: {
-        neutral: "bg-neutral-subtle text-neutral-foreground",
-        success: "bg-success-subtle text-success-foreground",
-        warning: "bg-warning-subtle text-warning-foreground",
-        info: "bg-info-subtle text-info-foreground",
-        danger: "bg-danger-subtle text-danger-foreground",
+        neutral: "before:bg-neutral",
+        success: "before:bg-success",
+        warning: "before:bg-warning",
+        info: "before:bg-info",
+        danger: "bg-danger-subtle text-danger-foreground ring-0 before:bg-danger",
       },
     },
     defaultVariants: {

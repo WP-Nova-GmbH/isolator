@@ -35,7 +35,7 @@ Rules:
 
 Two primitive families, plus semantic tones. Tailwind's default palette is disabled, so every colour in the app comes from here.
 
-**Ink** is the neutral: cool greys with a slight lean toward glass, from `ink-25` (page) to `ink-950` (dark page).
+**Ink** is the neutral: cool greys with a slight lean toward glass, from `ink-50` to `ink-950` (dark page).
 
 **Glass** is the brand colour, named after the aqua glass of old telegraph line insulators. Use it for primary actions, focus rings, selection and the logo dot. It is never used to mean "good" or "done"; that's what the success tone is for.
 
@@ -43,21 +43,24 @@ Components use the semantic layer, never primitives directly:
 
 | Token | Light | Dark | Use |
 | --- | --- | --- | --- |
-| `background` | ink-25 | ink-950 | Page |
-| `surface` | white | ink-900 | Cards, tables, sidebar |
-| `surface-sunken` | ink-50 | #151b1d | Hover rows, wells |
+| `background` | ink-75 | ink-950 | Ground: window and navigation |
+| `surface` | white | ink-900 | The page sheet, cards, inputs |
+| `surface-sunken` | ink-75 | #151b1d | Hover rows, stat tiles, tab tracks |
 | `foreground` | ink-900 | ink-50 | Body text |
 | `muted-foreground` | ink-600 | ink-400 | Secondary text, control refs |
-| `border` / `border-strong` | ink-200 / ink-300 | ink-800 / ink-700 | Dividers / inputs |
-| `primary` | glass-700 | glass-400 | Primary buttons, links |
+| `border` / `border-strong` | ink-150 / ink-300 | ink-800 / ink-700 | Dividers / inputs |
+| `primary` | glass-600 | glass-400 | Primary buttons, the active nav icon |
+| `link` | glass-700 | glass-400 | Text links |
 | `selected` | glass-50 | #0d2725 | Active nav item, selected row |
 | `ring` | glass-500 | glass-400 | Focus outline |
 
-All text pairs meet WCAG AA (4.5:1) in both themes; primary buttons are 6.7:1.
+All text pairs meet WCAG AA (4.5:1) in both themes; primary buttons are 4.8:1.
 
 ### Status tones
 
-`success`, `warning`, `info`, `danger`, `neutral`, each with a solid, a `-subtle` background and a `-foreground` text colour. Map domain states to tones once, in one place:
+`success`, `warning`, `info`, `danger`, `neutral`, each with a solid, a `-subtle` background and a `-foreground` text colour. A status reads as a coloured dot beside the word, in a thin outlined pill. Only `danger` keeps its filled background, so it still stands out in a long table.
+
+Domain states map to tones once, in `state-badge.tsx`:
 
 | Domain state | Tone |
 | --- | --- |
@@ -80,25 +83,26 @@ Risk is likelihood × impact, each 1–5, so scores run 1–25. Bands:
 | High | 10–16 | `risk-high` |
 | Critical | 20–25 | `risk-critical` |
 
-17–19 can't occur on a 5 × 5 matrix. Use `riskBand()` and `<RiskScore />` from `components/risk-score.tsx` rather than repeating the thresholds. Each band has an `-on` token for text on the solid fill. Always show the number as well as the colour.
+17–19 can't occur on a 5 × 5 matrix. Use `riskBand()` and `<RiskScore />` from `components/risk-score.tsx` rather than repeating the thresholds. Scores are tinted chips. Solid band colours are kept for matrix cells that hold risks, so occupied cells stand out from the empty ones; each band has an `-on` token for text on the solid fill. Always show the number as well as the colour.
 
 ## Type
 
 | Role | Face | Where |
 | --- | --- | --- |
-| Display | Archivo, semi-expanded (`font-stretch: 112.5%`) | `h1`–`h3`, set by base styles |
+| Headings | Instrument Sans, semibold with tight tracking | `h1`–`h3`, set by base styles |
 | Body / UI | Instrument Sans | Everything else |
-| Mono | IBM Plex Mono | Control refs (`A.8.13`), scores, IDs, dates in tables |
+| Mono | IBM Plex Mono | Control refs (`A.8.13`) and record IDs (`R-03`) |
 
 Fonts are self-hosted through `@fontsource` packages, so the customer's browser never calls Google. Customers in the EU ask about this.
 
-Scale, using Tailwind's defaults: page title `text-2xl`, section `text-lg`, body and table text `text-sm`, labels and badges `text-xs`. Use `tabular-nums` wherever numbers line up.
+Base styles set the headings: page title 26 px, section 15 px. Body and table text are `text-sm`, labels and badges `text-xs`. Use `tabular-nums` wherever numbers line up, including scores and dates.
 
 ## Shape and space
 
-- Radius stays small: `rounded-sm` for badges and score chips, `rounded-md` for buttons, inputs and cards. The logo is square; the UI follows it.
-- Borders separate things; shadows are for things that float (menus, dialogs) and nothing else.
-- Space with flex/grid `gap`, on Tailwind's 4 px scale. Dense views (registers, the SoA) use `p-2` cells; forms use `gap-4`.
+- Radius: `rounded-sm` (6 px) for score chips, `rounded-md` (8 px) for buttons and inputs, `rounded-lg` (12 px) for cards and the page sheet, `rounded-xl` (16 px) for the sign-in card. Status badges are `rounded-full`.
+- The navigation sits on the ground and each page is one raised sheet. Borders separate things inside the sheet. Tables sit directly on the sheet, without a box.
+- Depth comes from four tokens, so it follows the theme: `shadow-xs` for raised controls, `shadow-button` for primary buttons, `shadow-sheet` for the page sheet, `shadow-float` for things that float.
+- Space with flex/grid `gap`, on Tailwind's 4 px scale. Registers and the SoA stay dense, with `py-2` cells; forms use `gap-4`.
 
 ## Components
 
@@ -108,13 +112,33 @@ Base components live in `components/ui/`. They started as stock shadcn and are o
 | --- | --- | --- |
 | `Button` | `ui/button.tsx` | `default` once per view; `outline` for other actions; `secondary`, `ghost` and `link` where a border is noise; `destructive` for deleting. 36 px tall by default |
 | `Badge` | `ui/badge.tsx` | `variant` is a tone: `neutral`, `success`, `warning`, `info`, `danger`. Always has a text label |
-| `Table` | `ui/table.tsx` | Registers. Wrap it in `rounded-md border bg-card` |
+| `Table` | `ui/table.tsx` | Registers. Bleeds 10 px past the sheet's padding, so cell text lines up with headings and hover rows reach past it |
 | `Alert` | `ui/alert.tsx` | `destructive` for load failures and blocking errors |
 | `Skeleton` | `ui/skeleton.tsx` | Loading states. The pulse stops under `prefers-reduced-motion` |
-| `Sidebar` | `ui/sidebar.tsx` | App shell. A 224 px rail on desktop, a sheet on phones |
-| `Input` | `ui/input.tsx` | Comes with `Sidebar`; 36 px tall to line up with `Button` |
+| `Sidebar` | `ui/sidebar.tsx` | App shell, `inset` variant. A 240 px rail on desktop, a sheet on phones |
+| `Input`, `Textarea`, `NativeSelect` | `ui/` | 36 px tall to line up with `Button` |
+| `Label`, `Card` | `ui/` | `Card` is a bordered section; give it its own layout with `flex flex-col gap-*` |
 | `Logo`, `Mark` | `logo.tsx` | Theme-aware SVG |
-| `RiskScore`, `riskBand` | `risk-score.tsx` | `Badge` filled with the risk band |
+| `RiskScore`, `RiskChip`, `riskBand` | `risk-score.tsx` | Tinted chip in the risk band's colour |
+| `RiskMatrix` | `risk-matrix.tsx` | The fixed 5 × 5 matrix |
+| `StateBadge` | `state-badge.tsx` | `Badge` for a domain state. The only place states map to tones |
+| `PageHeader`, `SectionHeader` | `page-header.tsx` | Title, description and actions |
+| `TabNav`, `RiskTabs`, `useTabFilter` | `tab-nav.tsx` | Segmented tabs made of links: routes, or a filter in the URL |
+| `StatGrid`, `StatTile` | `stat-tile.tsx` | Summary numbers on a sunken tile |
+| `HistoryList` | `history-list.tsx` | Timeline of Confirmations or Document versions |
+| `ConfirmationCard` | `confirmation-card.tsx` | The same card on every record that needs a Confirmation. Give it `form` to save what's on screen as part of confirming |
+| `RiskFields` | `risk-fields.tsx` | A risk's fields and live scores. Goes inside a form |
+| `TasksTable`, `NewTaskForm` | `tasks-table.tsx`, `new-task-form.tsx` | Tasks on the Tasks page and on a record |
+| `FormError` | `form-error.tsx` | Shows why the API refused what a Member tried |
+| `LifecycleCard` | `lifecycle-card.tsx` | Closing, ending, reopening or deleting a record, each with a reason |
+| `LinkPicker`, `LinkedItem` | `link-picker.tsx` | Linking records to each other and removing the link |
+| `SupplierFields`, `AssetFields`, `IncidentFields`, `DocumentFields` | `supplier-fields.tsx`, `asset-fields.tsx`, `incident-fields.tsx`, `document-fields.tsx` | A record's fields. Go inside a form |
+| `EvidenceTable`, `EvidenceForm` | `evidence-table.tsx`, `evidence-form.tsx` | Evidence on the Evidence page and on an SoA entry |
+| `CopyLink` | `copy-link.tsx` | An invitation link, shown once |
+| `Field`, `FieldGrid` | `field.tsx` | Label and control, and a grid of them |
+| `EntryPage` | `entry-page.tsx` | Pages outside the app: claim, sign-in, invitation |
+| `DetailLayout` | `detail-layout.tsx` | Main column with a side column that drops below it |
+| `MainCell`, `DataCell`, `Ref`, `RecordLink`, `TextLink` | `table-parts.tsx` | Cells and links inside registers |
 
 `Sheet`, `Separator` and `Tooltip` are installed as parts of `Sidebar`. Icons are [Lucide](https://lucide.dev): 16 px beside text, in `currentColor`.
 
@@ -124,8 +148,8 @@ Run `npx shadcn@latest add <component>` from `apps/web`, then review the diff be
 
 1. **Check `index.css`.** The CLI can write its own colours into the file. Stock values must not stay: `init` replaced our tokens with neutral greys when we first ran it, so don't run it again.
 2. **Map new tokens.** shadcn's names (`card`, `muted`, `accent`, `destructive`, `input`, `sidebar-*`) are aliases of ours in the "shadcn aliases" block. A new one goes there too, pointing at a semantic token, with no dark value of its own.
-3. **Fix focus.** Replace `outline-none`, `outline-hidden` and `focus-visible:ring-*` with `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`. Leaving `outline-hidden` in place hides the focus outline entirely.
-4. **Bring the shape in line.** Buttons, inputs and cards take `rounded-md`, badges `rounded-sm`, menus and dialogs `rounded-lg`. Hover uses `bg-muted`; the glass tint in `accent` is for selected things. Remove translate and scale effects.
+3. **Fix focus.** Replace `outline-none`, `outline-hidden` and `focus-visible:ring-*` with `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`. Leaving `outline-hidden` in place hides the focus outline entirely. Text fields use a soft halo instead: `focus-visible:border-ring focus-visible:outline-3 focus-visible:outline-offset-0 focus-visible:outline-ring/30`.
+4. **Bring the shape in line.** Buttons and inputs take `rounded-md`, cards, menus and dialogs `rounded-lg`, badges `rounded-full`. Hover uses `bg-muted`, or `bg-neutral-subtle` on the ground, where `muted` doesn't show; the glass tint in `accent` is for selected things. Remove translate and scale effects.
 
 ## Dark mode
 

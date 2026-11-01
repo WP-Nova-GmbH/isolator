@@ -3,7 +3,6 @@
 @import 'shadcn/tailwind.css';
 /* Self-hosted fonts: no request to Google from the customer's browser (GDPR). */
 @import '@fontsource-variable/instrument-sans';
-@import '@fontsource-variable/archivo/wdth.css';
 @import '@fontsource/ibm-plex-mono/400.css';
 @import '@fontsource/ibm-plex-mono/500.css';
 
@@ -31,9 +30,10 @@
   --color-black: #000000;
 
   /* Ink: cool neutrals with a slight glass bias. */
-  --color-ink-25: #fafbfb;
   --color-ink-50: #f4f6f6;
+  --color-ink-75: #f1f4f4;
   --color-ink-100: #e8ecec;
+  --color-ink-150: #e3e8e8;
   --color-ink-200: #d4dbdb;
   --color-ink-300: #b3bebf;
   --color-ink-400: #8a9799;
@@ -58,13 +58,13 @@
   --color-glass-950: #052928;
 
   --font-sans: 'Instrument Sans Variable', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'Archivo Variable', 'Instrument Sans Variable', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-  --font-heading: var(--font-display);
+  --font-heading: var(--font-sans);
 
-  --radius-sm: 0.25rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.5rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
 }
 
 /*
@@ -72,16 +72,17 @@
  * follow the OS unless `data-theme` on <html> pins one.
  */
 :root {
-  --background: var(--color-ink-25);
+  --background: var(--color-ink-75);
   --foreground: var(--color-ink-900);
   --surface: var(--color-white);
-  --surface-sunken: var(--color-ink-50);
+  --surface-sunken: var(--color-ink-75);
   --muted-foreground: var(--color-ink-600);
-  --border: var(--color-ink-200);
+  --border: var(--color-ink-150);
   --border-strong: var(--color-ink-300);
-  --primary: var(--color-glass-700);
-  --primary-hover: var(--color-glass-800);
+  --primary: var(--color-glass-600);
+  --primary-hover: var(--color-glass-700);
   --primary-foreground: var(--color-white);
+  --link: var(--color-glass-700);
   --selected: var(--color-glass-50);
   --selected-foreground: var(--color-glass-800);
   --ring: var(--color-glass-500);
@@ -100,18 +101,27 @@
   --danger: #b0233a;
   --danger-subtle: #fadde0;
   --danger-foreground: #8e1426;
+  --neutral: var(--color-ink-400);
   --neutral-subtle: var(--color-ink-100);
   --neutral-foreground: var(--color-ink-700);
 
-  /* Risk bands for likelihood × impact (1–25). Solid fills are for matrix cells. */
+  /* Risk bands for likelihood × impact (1–25). Solid fills are for matrix cells that hold risks. */
   --risk-low: #377d30;
   --risk-low-on: var(--color-white);
   --risk-medium: #e3ae2b;
   --risk-medium-on: var(--color-ink-900);
   --risk-high: #bc4a17;
   --risk-high-on: var(--color-white);
+  --risk-high-subtle: #fbe7dc;
+  --risk-high-foreground: #8a3410;
   --risk-critical: #b0233a;
   --risk-critical-on: var(--color-white);
+
+  /* Depth. The shadow-* utilities read these, so they switch with the theme. */
+  --elevation-xs: 0 1px 2px rgb(15 20 22 / 0.05);
+  --elevation-button: inset 0 1px 0 rgb(255 255 255 / 0.16), 0 1px 2px rgb(15 20 22 / 0.18);
+  --elevation-sheet: 0 1px 3px rgb(15 20 22 / 0.04);
+  --elevation-float: 0 1px 2px rgb(15 20 22 / 0.05), 0 16px 40px -20px rgb(15 20 22 / 0.18);
 }
 
 /*
@@ -130,12 +140,12 @@
   --accent-foreground: var(--selected-foreground);
   --destructive: var(--danger);
   --input: var(--border-strong);
-  --sidebar: var(--surface);
+  --sidebar: var(--background);
   --sidebar-foreground: var(--muted-foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: var(--selected);
-  --sidebar-accent-foreground: var(--selected-foreground);
+  --sidebar-accent: var(--surface);
+  --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
 }
@@ -152,6 +162,7 @@
     --primary: var(--color-glass-400);
     --primary-hover: var(--color-glass-300);
     --primary-foreground: var(--color-glass-950);
+    --link: var(--color-glass-400);
     --selected: #0d2725;
     --selected-foreground: var(--color-glass-200);
     --ring: var(--color-glass-400);
@@ -168,8 +179,15 @@
     --danger: #f2808e;
     --danger-subtle: #2f1519;
     --danger-foreground: #f49aa5;
+    --neutral: var(--color-ink-500);
     --neutral-subtle: #222a2d;
     --neutral-foreground: var(--color-ink-300);
+    --risk-high-subtle: #2c1a11;
+    --risk-high-foreground: #f4b694;
+    --elevation-xs: 0 1px 2px rgb(0 0 0 / 0.3);
+    --elevation-button: inset 0 1px 0 rgb(255 255 255 / 0.16), 0 1px 2px rgb(0 0 0 / 0.3);
+    --elevation-sheet: none;
+    --elevation-float: 0 16px 40px -20px rgb(0 0 0 / 0.6);
     color-scheme: dark;
   }
 }
@@ -185,6 +203,7 @@
   --primary: var(--color-glass-400);
   --primary-hover: var(--color-glass-300);
   --primary-foreground: var(--color-glass-950);
+  --link: var(--color-glass-400);
   --selected: #0d2725;
   --selected-foreground: var(--color-glass-200);
   --ring: var(--color-glass-400);
@@ -201,8 +220,15 @@
   --danger: #f2808e;
   --danger-subtle: #2f1519;
   --danger-foreground: #f49aa5;
+  --neutral: var(--color-ink-500);
   --neutral-subtle: #222a2d;
   --neutral-foreground: var(--color-ink-300);
+  --risk-high-subtle: #2c1a11;
+  --risk-high-foreground: #f4b694;
+  --elevation-xs: 0 1px 2px rgb(0 0 0 / 0.3);
+  --elevation-button: inset 0 1px 0 rgb(255 255 255 / 0.16), 0 1px 2px rgb(0 0 0 / 0.3);
+  --elevation-sheet: none;
+  --elevation-float: 0 16px 40px -20px rgb(0 0 0 / 0.6);
   color-scheme: dark;
 }
 
@@ -218,6 +244,7 @@
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
+  --color-link: var(--link);
   --color-selected: var(--selected);
   --color-selected-foreground: var(--selected-foreground);
   --color-ring: var(--ring);
@@ -234,6 +261,7 @@
   --color-danger: var(--danger);
   --color-danger-subtle: var(--danger-subtle);
   --color-danger-foreground: var(--danger-foreground);
+  --color-neutral: var(--neutral);
   --color-neutral-subtle: var(--neutral-subtle);
   --color-neutral-foreground: var(--neutral-foreground);
   --color-risk-low: var(--risk-low);
@@ -242,6 +270,8 @@
   --color-risk-medium-on: var(--risk-medium-on);
   --color-risk-high: var(--risk-high);
   --color-risk-high-on: var(--risk-high-on);
+  --color-risk-high-subtle: var(--risk-high-subtle);
+  --color-risk-high-foreground: var(--risk-high-foreground);
   --color-risk-critical: var(--risk-critical);
   --color-risk-critical-on: var(--risk-critical-on);
   --color-card: var(--card);
@@ -263,6 +293,10 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --shadow-xs: var(--elevation-xs);
+  --shadow-button: var(--elevation-button);
+  --shadow-sheet: var(--elevation-sheet);
+  --shadow-float: var(--elevation-float);
 }
 
 @layer base {
@@ -273,15 +307,30 @@
     background: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
     -webkit-font-smoothing: antialiased;
   }
   h1,
   h2,
   h3 {
-    font-family: var(--font-display);
-    font-stretch: 112.5%;
-    letter-spacing: -0.01em;
+    font-family: var(--font-heading);
+    font-weight: 600;
     text-wrap: balance;
+  }
+  h1 {
+    font-size: 1.625rem;
+    line-height: 2rem;
+    letter-spacing: -0.02em;
+  }
+  h2 {
+    font-size: 0.9375rem;
+    line-height: 1.375rem;
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
   }
   :focus-visible {
     outline: 2px solid var(--color-ring);

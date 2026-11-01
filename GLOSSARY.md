@@ -6,7 +6,9 @@
 
 **Scope** – the boundaries of the ISMS (clause 4.3): which companies, locations, units, systems are covered.
 
-**Member** – a person invited into an Organization. Every Member can see and do everything in its ISMS, except that a risk's Confirmation comes from its risk owner.
+**Member** – a person invited into an Organization. Every Member can see and do everything in its ISMS, except that a risk's Confirmation comes from its risk owner. A removed Member can no longer reach the Organization but stays on record, and comes back the same Member if invited again.
+
+**Invitation** – a link, good for one use and for 7 days, that lets one email address join an Organization as a Member. Any Member can create one, and the Operator can for any Organization.
 
 **Operator** – the person who claimed an install of Isolator. The Operator creates its Organizations and invites their first Members.
 
@@ -18,6 +20,12 @@
 
 **Supplier** – an outside company providing a product or service the Organization relies on. Service assets link to the Supplier that provides them.
 
+**Supplier review** – a dated check of a Supplier by a Member, with an outcome and notes, that sets the next review date. A correction is a new review.
+
+**Supplier file** – a dated contract, data processing agreement, certificate or security assessment for a Supplier, uploaded or with a note of where it is kept. It isn't a Document: it has no versions and needs no Confirmation.
+
+**Ended Supplier** – a Supplier that no longer serves the Organization. It leaves the register with a reason but stays on record, and can be resumed.
+
 **Risk** – a potential event that harms the confidentiality, integrity or availability of information, affecting any number of assets. Scored as likelihood × impact (1–5 each), before treatment and again after it (residual risk).
 
 **Risk criteria** – an Organization's acceptance threshold and the meaning of each likelihood and impact level.
@@ -26,21 +34,25 @@
 
 **Risk treatment** – the decision for a risk: mitigate (apply controls), accept, transfer, or avoid.
 
+**Closed risk** – a risk that no longer applies. Its risk owner closes it with a reason; it leaves the register but stays on record, and can be reopened, which needs a new Confirmation.
+
 **Risk assessment** – a dated review of the risk register. The first one establishes the register; recurring ones (at least yearly, or on significant change) revisit it. Each one preserves the register as it stood on that date.
 
 **Confirmation** – a Member's dated decision on an SoA entry, a risk rating, a risk treatment or a Document version, kept together with the value it replaced. Every such decision needs one, whether a person or AI drafted it.
 
-**Incident** – an information security event that has happened and needs handling. A risk is what could happen; an incident is what did.
+**Incident** – an information security event that has happened and needs handling. A risk is what could happen; an incident is what did. It is closed with how it was resolved, and stays on record.
 
 **Nonconformity** – a failure to meet a requirement of the standard or of the Organization's own ISMS, found for example in an internal audit.
 
-**Task** – follow-up work with an owner and a due date, linked to the risk, Nonconformity or control it belongs to.
+**Task** – follow-up work with an owner and a due date, linked to the risk, Nonconformity, control, Supplier or Incident it belongs to. A Task that is no longer needed is cancelled with a reason, and stays on record.
 
 **Register** – a list of records of one kind, each with its own lifecycle: risks, assets, suppliers, incidents, nonconformities.
 
 **Readiness checklist** – everything clauses 4–10 and Annex A need for the certificate, each item marked done, drafted or missing.
 
-**Audit file** – everything an Organization shows a certification body: its SoA, registers, Documents and Evidence.
+**Audit file** – everything an Organization shows a certification body: its SoA, registers, Documents, Evidence and Audit trail.
+
+**Audit trail** – an Organization's permanent record of who changed what, when and why. Entries can't be edited or removed. Deleting a record takes it out of its register, never out of the Audit trail, and only a draft nobody ever confirmed can be deleted.
 
 **Scan** – an automated check against an organization's systems (cloud accounts, identity provider, endpoints, external surface) that produces findings.
 
@@ -48,4 +60,6 @@
 
 **Evidence** – a dated file or a link to a Document showing a control is operating (screenshot, scan result, log export), attached to an SoA entry. It has no versions and needs no Confirmation.
 
-**Document** – a versioned record the Organization maintains in its audit file, such as a policy, a security objective or a competence record. Each version needs a Confirmation.
+**Document** – a versioned record the Organization maintains in its audit file, such as a policy, a security objective or a competence record. Each version needs a Confirmation, and the last confirmed version stays in force until a newer one is confirmed.
+
+**Withdrawn Document** – a Document that no longer applies. It leaves the list with a reason but stays on record, and can be reinstated.

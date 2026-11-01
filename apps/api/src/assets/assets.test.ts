@@ -1,0 +1,228 @@
+import { randomUUID } from 'node:crypto';
+import { afterAll, describe, expect, it } from 'vitest';
+import { AuditTrailService } from '../audit/audit-trail';
+import { createDb } from '../db/client';
+import { members, organizations, users } from '../db/schema';
+import type { CurrentMember } from '../members/current-member';
+import { RiskCriteriaService } from '../risks/risk-criteria.service';
+import { RisksService } from '../risks/risks.service';
+import { SuppliersService } from '../suppliers/suppliers.service';
+import { testDatabaseUrl } from '../test/database';
+import { testFiles } from '../test/files';
+import { AssetsService, type AssetInput } from './assets.service';
+
+const { db, client } = createDb(testDatabaseUrl());
+const trail = new AuditTrailService(db);
+const suppliers = new SuppliersService(db, trail, testFiles(db).files);
+const assets = new AssetsService(db, suppliers, trail);
+const risks = new RisksService(db, new RiskCriteriaService(db), trail);
+
+afterAll(() => client.end());
+
+async function organization() {
+  const [row] = await db.insert(organizations).values({ name: 'Test' }).returning();
+  const [user] = await db
+    .insert(users)
+    .values({ name: 'Owner', email: `${randomUUID()}@example.com` })
+    .returning();
+  const [member] = await db
+    .insert(members)
+    .values({ organizationId: row.id, userId: user.id })
+    .returning();
+  const owner: CurrentMember = {
+    id: member.id,
+    organizationId: row.id,
+    organizationName: 'Test',
+    name: 'Owner',
+    email: user.email,
+  };
+  return { id: row.id, owner };
+}
+
+function input(ownerId: string, overrides: Partial<AssetInput> = {}): AssetInput {
+  return {
+    name: 'CRM',
+    type: 'software',
+    classification: 'confidential',
+    ownerId,
+    supplierRef: null,
+    ...overrides,
+  };
+}
+
+const supplierInput = (ownerId: string) => ({
+  name: 'CRM Ltd',
+  provides: 'CRM',
+  ownerId,
+  criticality: 'medium' as const,
+  handlesPersonalData: false,
+  contact: '',
+  contractEnds: null,
+  exitPlan: '',
+  nextReviewOn: '2099-01-01',
+});
+
+async function withRisk(org: Awaited<ReturnType<typeof organization>>, assetId: string) {
+  const { ref } = await risks.create(org.owner, {
+    title: 'Outage',
+    description: '',
+    ownerId: org.owner.id,
+    likelihood: 2,
+    impact: 3,
+    residualLikelihood: null,
+    residualImpact: null,
+    treatment: null,
+    reviewOn: '2099-01-01',
+  });
+  await risks.linkAsset(org.owner, ref, assetId);
+  return ref;
+}
+
+describe('retiring an asset', () => {
+  it('moves it out of the register, freezes it, and keeps it on record', async () => {
+    const org = await organization();
+    const { id } = await assets.create(org.owner, input(org.owner.id));
+    await assets.retire(org.owner, id, 'Replaced by the new CRM');
+
+    expect(await assets.list(org.id)).toEqual([]);
+    const [retired] = await assets.list(org.id, 'retired');
+    expect(retired).toMatchObject({ id, retiredReason: 'Replaced by the new CRM' });
+    await expect(assets.update(org.owner, id, input(org.owner.id))).rejects.toThrow('Reinstate');
+    expect((await assets.get(org.id, id)).history[0]).toMatchObject({
+      action: 'asset.retired',
+      reason: 'Replaced by the new CRM',
+    });
+  });
+
+  it('is refused while an open risk points at it', async () => {
+    const org = await organization();
+    const { id } = await assets.create(org.owner, input(org.owner.id));
+    const ref = await withRisk(org, id);
+    await expect(assets.retire(org.owner, id, 'Gone')).rejects.toThrow('open risk');
+    await risks.close(org.owner, ref, 'Gone');
+    await expect(assets.retire(org.owner, id, 'Gone')).resolves.toEqual({ id });
+  });
+
+  it('takes it off its Supplier, so the Supplier can end', async () => {
+    const org = await organization();
+    const { ref } = await suppliers.create(org.owner, supplierInput(org.owner.id));
+    const { id } = await assets.create(org.owner, input(org.owner.id, { supplierRef: ref }));
+    await assets.retire(org.owner, id, 'Gone');
+    expect((await suppliers.get(org.id, ref)).assets).toEqual([]);
+    await expect(suppliers.end(org.owner, ref, 'Moved')).resolves.toEqual({ ref });
+  });
+
+  it('stops it being linked to a risk or a Supplier', async () => {
+    const org = await organization();
+    const { id } = await assets.create(org.owner, input(org.owner.id));
+    await assets.retire(org.owner, id, 'Gone');
+    const { ref } = await suppliers.create(org.owner, supplierInput(org.owner.id));
+    await expect(suppliers.linkAsset(org.owner, ref, id)).rejects.toThrow('Choose an asset');
+  });
+
+  it('can be undone, with a reason', async () => {
+    const org = await organization();
+    const { id } = await assets.create(org.owner, input(org.owner.id));
+    await expect(assets.reinstate(org.owner, id, 'Back')).rejects.toThrow('not retired');
+    await assets.retire(org.owner, id, 'Gone');
+    await assets.reinstate(org.owner, id, 'Back in use');
+    expect(await assets.get(org.id, id)).toMatchObject({ retiredAt: null, retiredReason: null });
+  });
+});
+
+describe('deleting an asset', () => {
+  it('takes it out of the register but keeps it in the Audit trail', async () => {
+    const org = await organization();
+    const { id } = await assets.create(org.owner, input(org.owner.id));
+    await assets.delete(org.owner, id, 'Entered twice');
+
+    expect(await assets.list(org.id)).toEqual([]);
+    expect(await assets.list(org.id, 'retired')).toEqual([]);
+    await expect(assets.get(org.id, id)).rejects.toThrow('does not exist');
+    expect((await trail.list(org.id)).events[0]).toMatchObject({
+      action: 'asset.deleted',
+      recordLabel: 'CRM',
+      reason: 'Entered twice',
+      before: { classification: 'confidential' },
+    });
+  });
+
+  it('is refused once a risk points at it, even a closed one', async () => {
+    const org = await organization();
+    const { id } = await assets.create(org.owner, input(org.owner.id));
+    const ref = await withRisk(org, id);
+    await risks.close(org.owner, ref, 'Gone');
+    await expect(assets.delete(org.owner, id, 'Mistake')).rejects.toThrow('stays on record');
+    expect((await assets.get(org.id, id)).deletable).toBe(false);
+  });
+});
+
+describe('assets', () => {
+  it('can be added, and appear in the register', async () => {
+    const org = await organization();
+    const { id } = await assets.create(org.owner, input(org.owner.id));
+    expect(await assets.list(org.id)).toEqual([
+      expect.objectContaining({
+        id,
+        name: 'CRM',
+        ownerName: 'Owner',
+        supplier: null,
+        risks: 0,
+      }),
+    ]);
+    expect((await assets.get(org.id, id)).history[0]).toMatchObject({
+      action: 'asset.added',
+      after: { name: 'CRM', ownerName: 'Owner' },
+    });
+  });
+
+  it('can be changed, and the Audit trail keeps what they were', async () => {
+    const org = await organization();
+    const { id } = await assets.create(org.owner, input(org.owner.id));
+    await assets.update(org.owner, id, input(org.owner.id, { classification: 'internal' }));
+    await assets.update(org.owner, id, input(org.owner.id, { classification: 'internal' }));
+    const { history, classification } = await assets.get(org.id, id);
+    expect(classification).toBe('internal');
+    expect(history.map((event) => event.action)).toEqual(['asset.changed', 'asset.added']);
+    expect(history[0]).toMatchObject({
+      before: { classification: 'confidential' },
+      after: { classification: 'internal' },
+    });
+  });
+
+  it('link to the Supplier that provides them', async () => {
+    const org = await organization();
+    const { ref } = await suppliers.create(org.owner, supplierInput(org.owner.id));
+    const { id } = await assets.create(org.owner, input(org.owner.id, { supplierRef: ref }));
+    expect((await assets.get(org.id, id)).supplier).toEqual({ ref, name: 'CRM Ltd' });
+    expect((await suppliers.get(org.id, ref)).assets.map((asset) => asset.id)).toEqual([id]);
+
+    await assets.update(org.owner, id, input(org.owner.id));
+    expect((await assets.get(org.id, id)).supplier).toBeNull();
+  });
+
+  it('refuse a Supplier that has ended', async () => {
+    const org = await organization();
+    const { ref } = await suppliers.create(org.owner, supplierInput(org.owner.id));
+    await suppliers.end(org.owner, ref, 'Gone');
+    await expect(
+      assets.create(org.owner, input(org.owner.id, { supplierRef: ref })),
+    ).rejects.toThrow('Resume');
+  });
+
+  it('stay within the Organization', async () => {
+    const a = await organization();
+    const b = await organization();
+    const { id } = await assets.create(a.owner, input(a.owner.id));
+    const { ref } = await suppliers.create(b.owner, supplierInput(b.owner.id));
+
+    expect(await assets.list(b.id)).toEqual([]);
+    await expect(assets.get(b.id, id)).rejects.toThrow('does not exist');
+    await expect(assets.update(b.owner, id, input(b.owner.id))).rejects.toThrow('does not exist');
+    await expect(assets.create(a.owner, input(b.owner.id))).rejects.toThrow('Choose an owner');
+    await expect(
+      assets.create(a.owner, input(a.owner.id, { supplierRef: 'S-99' })),
+    ).rejects.toThrow('does not exist');
+    expect(ref).toBe('S-01');
+  });
+});
