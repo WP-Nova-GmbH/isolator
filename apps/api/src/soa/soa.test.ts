@@ -6,6 +6,7 @@ import { members, organizations, users } from '../db/schema';
 import { DocumentsService } from '../documents/documents.service';
 import { IncidentsService } from '../incidents/incidents.service';
 import type { CurrentMember } from '../members/current-member';
+import { NonconformitiesService } from '../nonconformities/nonconformities.service';
 import { RiskCriteriaService } from '../risks/risk-criteria.service';
 import { RisksService } from '../risks/risks.service';
 import { SuppliersService } from '../suppliers/suppliers.service';
@@ -27,6 +28,7 @@ const tasks = new TasksService(
   risks,
   new SuppliersService(db, trail, files),
   new IncidentsService(db, risks, trail),
+  new NonconformitiesService(db, trail),
   soa,
 );
 

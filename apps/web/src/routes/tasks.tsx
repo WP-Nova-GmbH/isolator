@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { api, attempt } from '@/lib/api';
 import type { Incident } from '@/lib/incidents';
 import { useAppData } from '@/lib/members';
+import type { Nonconformity } from '@/lib/nonconformities';
 import { toTask, type ApiTask, type Risk } from '@/lib/risks';
 import type { SoaEntry } from '@/lib/soa';
 import type { Supplier } from '@/lib/suppliers';
@@ -23,14 +24,15 @@ const tabs = [
 ];
 
 export async function tasksLoader() {
-  const [tasks, risks, soa, suppliers, incidents] = await Promise.all([
+  const [tasks, risks, soa, suppliers, incidents, nonconformities] = await Promise.all([
     api<ApiTask[]>('/tasks'),
     api<Risk[]>('/risks'),
     api<SoaEntry[]>('/soa'),
     api<Supplier[]>('/suppliers'),
     api<Incident[]>('/incidents?state=open'),
+    api<Nonconformity[]>('/nonconformities?state=open'),
   ]);
-  return { tasks, risks, soa, suppliers, incidents };
+  return { tasks, risks, soa, suppliers, incidents, nonconformities };
 }
 
 export async function tasksAction({ request }: ActionFunctionArgs) {
@@ -50,7 +52,8 @@ export async function tasksAction({ request }: ActionFunctionArgs) {
 }
 
 export function Tasks() {
-  const { tasks, risks, soa, suppliers, incidents } = useLoaderData<typeof tasksLoader>();
+  const { tasks, risks, soa, suppliers, incidents, nonconformities } =
+    useLoaderData<typeof tasksLoader>();
   const { me } = useAppData();
   const result = useActionData<typeof tasksAction>();
   const { value, items } = useTabFilter(tabs);
@@ -92,13 +95,20 @@ export function Tasks() {
         label: `${incident.ref} ${incident.title}`,
       })),
     },
+    {
+      group: 'Nonconformities',
+      options: nonconformities.map((item) => ({
+        value: `nonconformityRef:${item.ref}`,
+        label: `${item.ref} ${item.title}`,
+      })),
+    },
   ];
 
   return (
     <>
       <PageHeader
         title="Tasks"
-        description="All follow-up work from risks, controls, Suppliers and Incidents."
+        description="All follow-up work from risks, controls, Suppliers, Incidents and Nonconformities."
         actions={
           <Button type="button" onClick={() => setAdding(true)}>
             New Task

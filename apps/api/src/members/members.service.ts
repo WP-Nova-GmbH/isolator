@@ -8,6 +8,7 @@ import {
   documents,
   incidents,
   members,
+  nonconformities,
   organizations,
   risks,
   soaEntries,
@@ -22,6 +23,7 @@ type OwnedTable =
   | typeof assets
   | typeof suppliers
   | typeof incidents
+  | typeof nonconformities
   | typeof documents
   | typeof soaEntries
   | typeof tasks;
@@ -130,6 +132,10 @@ export class MembersService {
       tally(assets, and(isNull(assets.retiredAt), isNull(assets.deletedAt))),
       tally(suppliers, and(isNull(suppliers.endedAt), isNull(suppliers.deletedAt))),
       tally(incidents, and(isNull(incidents.closedAt), isNull(incidents.deletedAt))),
+      tally(
+        nonconformities,
+        and(isNull(nonconformities.closedAt), isNull(nonconformities.deletedAt)),
+      ),
       tally(documents, and(isNull(documents.withdrawnAt), isNull(documents.deletedAt))),
       tally(soaEntries, undefined),
       tally(tasks, and(isNull(tasks.doneAt), isNull(tasks.cancelledAt))),
@@ -139,6 +145,7 @@ export class MembersService {
       ['asset', 'assets'],
       ['Supplier', 'Suppliers'],
       ['Incident', 'Incidents'],
+      ['Nonconformity', 'Nonconformities'],
       ['Document', 'Documents'],
       ['SoA entry', 'SoA entries'],
       ['open Task', 'open Tasks'],

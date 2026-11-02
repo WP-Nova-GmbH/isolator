@@ -13,7 +13,13 @@ export interface Task {
 
 export function addTask(
   form: FormData,
-  belongsTo: { riskRef?: string; supplierRef?: string; incidentRef?: string; soaRef?: string },
+  belongsTo: {
+    riskRef?: string;
+    supplierRef?: string;
+    incidentRef?: string;
+    nonconformityRef?: string;
+    soaRef?: string;
+  },
 ) {
   return api('/tasks', {
     method: 'POST',

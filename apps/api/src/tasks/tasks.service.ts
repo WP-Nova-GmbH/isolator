@@ -13,6 +13,7 @@ import {
   controls,
   incidents,
   members,
+  nonconformities,
   risks,
   soaEntries,
   suppliers,
@@ -21,6 +22,10 @@ import {
 } from '../db/schema';
 import { formatIncidentRef, IncidentsService } from '../incidents/incidents.service';
 import type { CurrentMember } from '../members/current-member';
+import {
+  formatNonconformityRef,
+  NonconformitiesService,
+} from '../nonconformities/nonconformities.service';
 import { formatRiskRef } from '../risks/risk-decision';
 import { RisksService } from '../risks/risks.service';
 import { soaRef, SoaService, soaTitle } from '../soa/soa.service';
@@ -36,17 +41,33 @@ export const taskInput = z
     riskRef: z.string().optional(),
     supplierRef: z.string().optional(),
     incidentRef: z.string().optional(),
+    nonconformityRef: z.string().optional(),
     soaRef: z.string().optional(),
   })
   .refine(
     (task) =>
-      [task.riskRef, task.supplierRef, task.incidentRef, task.soaRef].filter(Boolean).length === 1,
+      [
+        task.riskRef,
+        task.supplierRef,
+        task.incidentRef,
+        task.nonconformityRef,
+        task.soaRef,
+      ].filter(Boolean).length === 1,
     { message: 'Choose what this Task belongs to.' },
   );
 
 export const taskStateInput = z.object({ done: z.boolean() });
 
 export type TaskInput = z.output<typeof taskInput>;
+
+interface BelongsTo {
+  risk: typeof risks.$inferSelect | null;
+  supplier: typeof suppliers.$inferSelect | null;
+  incident: typeof incidents.$inferSelect | null;
+  nonconformity: typeof nonconformities.$inferSelect | null;
+  entry: typeof soaEntries.$inferSelect | null;
+  control: typeof controls.$inferSelect | null;
+}
 
 @Injectable()
 export class TasksService {
@@ -55,12 +76,19 @@ export class TasksService {
     @Inject(RisksService) private readonly risks: RisksService,
     @Inject(SuppliersService) private readonly suppliers: SuppliersService,
     @Inject(IncidentsService) private readonly incidents: IncidentsService,
+    @Inject(NonconformitiesService) private readonly nonconformities: NonconformitiesService,
     @Inject(SoaService) private readonly soa: SoaService,
   ) {}
 
   async list(
     organizationId: string,
-    on: { riskRef?: string; supplierRef?: string; incidentRef?: string; soaRef?: string } = {},
+    on: {
+      riskRef?: string;
+      supplierRef?: string;
+      incidentRef?: string;
+      nonconformityRef?: string;
+      soaRef?: string;
+    } = {},
   ) {
     const riskId = on.riskRef ? await this.risks.idOf(organizationId, on.riskRef) : undefined;
     const supplierId = on.supplierRef
@@ -68,6 +96,9 @@ export class TasksService {
       : undefined;
     const incidentId = on.incidentRef
       ? await this.incidents.idOf(organizationId, on.incidentRef)
+      : undefined;
+    const nonconformityId = on.nonconformityRef
+      ? await this.nonconformities.idOf(organizationId, on.nonconformityRef)
       : undefined;
     const soaEntryId = on.soaRef
       ? (await this.soa.entry(organizationId, on.soaRef)).entry.id
@@ -81,6 +112,7 @@ export class TasksService {
         control: controls,
         supplier: suppliers,
         incident: incidents,
+        nonconformity: nonconformities,
       })
       .from(tasks)
       .innerJoin(members, eq(members.id, tasks.ownerId))
@@ -90,39 +122,37 @@ export class TasksService {
       .leftJoin(controls, eq(controls.id, soaEntries.controlId))
       .leftJoin(suppliers, eq(suppliers.id, tasks.supplierId))
       .leftJoin(incidents, eq(incidents.id, tasks.incidentId))
+      .leftJoin(nonconformities, eq(nonconformities.id, tasks.nonconformityId))
       .where(
         and(
           eq(tasks.organizationId, organizationId),
           riskId ? eq(tasks.riskId, riskId) : undefined,
           supplierId ? eq(tasks.supplierId, supplierId) : undefined,
           incidentId ? eq(tasks.incidentId, incidentId) : undefined,
+          nonconformityId ? eq(tasks.nonconformityId, nonconformityId) : undefined,
           soaEntryId ? eq(tasks.soaEntryId, soaEntryId) : undefined,
           // Tasks of a deleted record leave with it. Deleting needs them finished, so none are lost.
           or(isNull(tasks.riskId), isNull(risks.deletedAt)),
           or(isNull(tasks.supplierId), isNull(suppliers.deletedAt)),
           or(isNull(tasks.incidentId), isNull(incidents.deletedAt)),
+          or(isNull(tasks.nonconformityId), isNull(nonconformities.deletedAt)),
         ),
       )
       .orderBy(asc(tasks.dueOn), asc(tasks.createdAt));
     const now = today();
-    return rows.map(({ task, ownerName, risk, entry, control, supplier, incident }) => ({
-      id: task.id,
-      title: task.title,
-      ownerId: task.ownerId,
-      ownerName,
-      dueOn: task.dueOn,
-      state: this.state(task, now),
-      cancelledReason: task.cancelledReason,
-      belongsTo: risk
-        ? { kind: 'risk', ref: formatRiskRef(risk.number), title: risk.title }
-        : supplier
-          ? { kind: 'supplier', ref: formatSupplierRef(supplier.number), title: supplier.name }
-          : incident
-            ? { kind: 'incident', ref: formatIncidentRef(incident.number), title: incident.title }
-            : entry
-              ? { kind: 'soa', ref: soaRef(entry, control), title: soaTitle(entry, control) }
-              : null,
-    }));
+    return rows.map((row) => {
+      const { task, ownerName } = row;
+      return {
+        id: task.id,
+        title: task.title,
+        ownerId: task.ownerId,
+        ownerName,
+        dueOn: task.dueOn,
+        state: this.state(task, now),
+        cancelledReason: task.cancelledReason,
+        belongsTo: this.belongsTo(row),
+      };
+    });
   }
 
   async create(member: CurrentMember, input: TaskInput) {
@@ -135,6 +165,9 @@ export class TasksService {
       : null;
     const incidentId = input.incidentRef
       ? await this.incidents.openIdOf(organizationId, input.incidentRef)
+      : null;
+    const nonconformityId = input.nonconformityRef
+      ? await this.nonconformities.openIdOf(organizationId, input.nonconformityRef)
       : null;
     const soaEntryId = input.soaRef
       ? (await this.soa.entry(organizationId, input.soaRef)).entry.id
@@ -156,6 +189,7 @@ export class TasksService {
           riskId,
           supplierId,
           incidentId,
+          nonconformityId,
           soaEntryId,
         })
         .returning();
@@ -163,7 +197,12 @@ export class TasksService {
         action: 'task.added',
         recordType: 'task',
         recordId: task.id,
-        recordRef: input.riskRef ?? input.supplierRef ?? input.incidentRef ?? input.soaRef,
+        recordRef:
+          input.riskRef ??
+          input.supplierRef ??
+          input.incidentRef ??
+          input.nonconformityRef ??
+          input.soaRef,
         recordLabel: task.title,
         after: { ownerName: owner.name, dueOn: task.dueOn },
       });
@@ -220,6 +259,25 @@ export class TasksService {
       });
       return { id: task.id };
     });
+  }
+
+  private belongsTo({ risk, supplier, incident, nonconformity, entry, control }: BelongsTo) {
+    if (risk) return { kind: 'risk', ref: formatRiskRef(risk.number), title: risk.title };
+    if (supplier) {
+      return { kind: 'supplier', ref: formatSupplierRef(supplier.number), title: supplier.name };
+    }
+    if (incident) {
+      return { kind: 'incident', ref: formatIncidentRef(incident.number), title: incident.title };
+    }
+    if (nonconformity) {
+      return {
+        kind: 'nonconformity',
+        ref: formatNonconformityRef(nonconformity.number),
+        title: nonconformity.title,
+      };
+    }
+    if (entry) return { kind: 'soa', ref: soaRef(entry, control), title: soaTitle(entry, control) };
+    return null;
   }
 
   private state(task: typeof tasks.$inferSelect, now: string) {

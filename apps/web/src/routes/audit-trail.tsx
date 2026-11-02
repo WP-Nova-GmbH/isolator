@@ -31,6 +31,7 @@ const tabs = [
   { value: 'suppliers', label: 'Suppliers' },
   { value: 'assets', label: 'Assets' },
   { value: 'incidents', label: 'Incidents' },
+  { value: 'nonconformities', label: 'Nonconformities' },
   { value: 'tasks', label: 'Tasks' },
   { value: 'files', label: 'Files' },
   { value: 'members', label: 'Members' },

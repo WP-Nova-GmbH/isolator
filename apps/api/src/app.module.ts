@@ -10,6 +10,7 @@ import { FilesModule } from './files/files.module';
 import { HealthController } from './health/health.controller';
 import { IncidentsModule } from './incidents/incidents.module';
 import { MembersModule } from './members/members.module';
+import { NonconformitiesModule } from './nonconformities/nonconformities.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { RisksModule } from './risks/risks.module';
 import { SoaModule } from './soa/soa.module';
@@ -30,6 +31,7 @@ import { TasksModule } from './tasks/tasks.module';
     RisksModule,
     SuppliersModule,
     IncidentsModule,
+    NonconformitiesModule,
     SoaModule,
     DocumentsModule,
     TasksModule,

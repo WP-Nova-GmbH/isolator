@@ -132,7 +132,7 @@ Base components live in `components/ui/`. They started as stock shadcn and are o
 | `FormError` | `form-error.tsx` | Shows why the API refused what a Member tried |
 | `LifecycleCard` | `lifecycle-card.tsx` | Closing, ending, reopening or deleting a record, each with a reason |
 | `LinkPicker`, `LinkedItem` | `link-picker.tsx` | Linking records to each other and removing the link |
-| `SupplierFields`, `AssetFields`, `IncidentFields`, `DocumentFields` | `supplier-fields.tsx`, `asset-fields.tsx`, `incident-fields.tsx`, `document-fields.tsx` | A record's fields. Go inside a form |
+| `SupplierFields`, `AssetFields`, `IncidentFields`, `NonconformityFields`, `DocumentFields` | `supplier-fields.tsx`, `asset-fields.tsx`, `incident-fields.tsx`, `nonconformity-fields.tsx`, `document-fields.tsx` | A record's fields. Go inside a form |
 | `EvidenceTable`, `EvidenceForm` | `evidence-table.tsx`, `evidence-form.tsx` | Evidence on the Evidence page and on an SoA entry |
 | `CopyLink` | `copy-link.tsx` | An invitation link, shown once |
 | `Field`, `FieldGrid` | `field.tsx` | Label and control, and a grid of them |

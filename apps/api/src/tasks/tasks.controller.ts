@@ -25,9 +25,16 @@ export class TasksController {
     @Query('risk') riskRef?: string,
     @Query('supplier') supplierRef?: string,
     @Query('incident') incidentRef?: string,
+    @Query('nonconformity') nonconformityRef?: string,
     @Query('soa') soaRef?: string,
   ) {
-    return this.tasks.list(member.organizationId, { riskRef, supplierRef, incidentRef, soaRef });
+    return this.tasks.list(member.organizationId, {
+      riskRef,
+      supplierRef,
+      incidentRef,
+      nonconformityRef,
+      soaRef,
+    });
   }
 
   @Post()

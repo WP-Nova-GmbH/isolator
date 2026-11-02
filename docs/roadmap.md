@@ -25,7 +25,7 @@ Isolator has to carry an ISMS from nothing to a certificate and beyond. The phas
 - [x] Supplier register: reviews, contracts and certificates, linked assets, risks and Tasks
 - [x] Risk register with likelihood × impact matrix, scores before and after treatment, risk owners, linked assets and controls
 - [x] Risk assessments
-- [ ] Tasks (done for risks, SoA entries, Suppliers and Incidents; Nonconformities to come)
+- [x] Tasks on risks, SoA entries, Suppliers, Incidents and Nonconformities
 - [x] Readiness checklist on the Overview page
 - [ ] Policy templates (own wording, not ISO text)
 
@@ -37,7 +37,7 @@ Isolator has to carry an ISMS from nothing to a certificate and beyond. The phas
 
 ## Phase 4 – Review and Certify
 
-- [ ] Nonconformity register
+- [x] Nonconformity register
 - [x] Internal audit and management review as Documents
 - [ ] Audit file export (the page shows what goes in; the ZIP is still to come)
 

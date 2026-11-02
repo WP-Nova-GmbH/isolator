@@ -32,7 +32,7 @@ export async function auditFileLoader() {
 type AuditFileData = Awaited<ReturnType<typeof auditFileLoader>>;
 
 function parts(data: AuditFileData) {
-  const { soa, risks, assets, suppliers, incidents, documents, evidence } = data;
+  const { soa, risks, assets, suppliers, incidents, nonconformities, documents, evidence } = data;
   return [
     {
       links: [{ label: 'Statement of Applicability', to: '/soa' }],
@@ -56,9 +56,12 @@ function parts(data: AuditFileData) {
       unconfirmed: null,
     },
     {
-      links: [{ label: 'Incidents', to: '/incidents' }],
+      links: [
+        { label: 'Incidents', to: '/incidents' },
+        { label: 'Nonconformities', to: '/nonconformities' },
+      ],
       format: 'PDF',
-      included: `${incidents.length} records`,
+      included: `${incidents.length + nonconformities.length} records`,
       unconfirmed: null,
     },
     {

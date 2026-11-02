@@ -86,13 +86,19 @@ export interface ApiTask {
   state: State<'task'>;
   cancelledReason: string | null;
   belongsTo: {
-    kind: 'risk' | 'soa' | 'supplier' | 'incident';
+    kind: 'risk' | 'soa' | 'supplier' | 'incident' | 'nonconformity';
     ref: string;
     title: string;
   } | null;
 }
 
-const taskPaths = { risk: 'risks', soa: 'soa', supplier: 'suppliers', incident: 'incidents' };
+const taskPaths = {
+  risk: 'risks',
+  soa: 'soa',
+  supplier: 'suppliers',
+  incident: 'incidents',
+  nonconformity: 'nonconformities',
+};
 
 export function toTask(task: ApiTask): Task {
   const { belongsTo } = task;

@@ -1,6 +1,7 @@
 import type { State } from '@/components/state-badge';
 import { api } from '@/lib/api';
 import type { DocumentKind, IsmsDocument } from '@/lib/documents';
+import type { Nonconformity } from '@/lib/nonconformities';
 import type { Risk, RiskAssessmentList, RiskCriteria } from '@/lib/risks';
 import type { SoaEntry } from '@/lib/soa';
 
@@ -19,14 +20,15 @@ export interface ReadinessGroup {
 }
 
 export async function readinessData() {
-  const [risks, { assessments }, criteria, soa, documents] = await Promise.all([
+  const [risks, { assessments }, criteria, soa, documents, nonconformities] = await Promise.all([
     api<Risk[]>('/risks'),
     api<RiskAssessmentList>('/risk-assessments'),
     api<RiskCriteria>('/risk-criteria'),
     api<SoaEntry[]>('/soa'),
     api<IsmsDocument[]>('/documents'),
+    api<Nonconformity[]>('/nonconformities'),
   ]);
-  return { risks, assessments, criteria, soa, documents };
+  return { risks, assessments, criteria, soa, documents, nonconformities };
 }
 
 type ReadinessData = Awaited<ReturnType<typeof readinessData>>;
@@ -53,6 +55,16 @@ function controlsState(entries: SoaEntry[]): ReadinessState {
   return confirmed > 0 || entries.some((entry) => entry.justification) ? 'Drafted' : 'Missing';
 }
 
+function nonconformitiesState(items: Nonconformity[], documents: IsmsDocument[]): ReadinessState {
+  if (items.some((item) => !item.closedAt)) return 'Drafted';
+  if (items.length > 0) return 'Done';
+  // An empty register only means something once an internal audit has looked.
+  const audited = documents.some(
+    (document) => document.kind === 'internal_audit' && document.versionInForce !== null,
+  );
+  return audited ? 'Done' : 'Missing';
+}
+
 function themeItem(soa: SoaEntry[], ref: string, name: string, theme: SoaEntry['theme']) {
   const entries = soa.filter((entry) => entry.theme === theme);
   const confirmed = entries.filter((entry) => entry.confirmation).length;
@@ -66,7 +78,7 @@ function themeItem(soa: SoaEntry[], ref: string, name: string, theme: SoaEntry['
 
 /** Everything the certificate needs, read from the records themselves. */
 export function readinessGroups(data: ReadinessData): ReadinessGroup[] {
-  const { risks, assessments, criteria, soa, documents } = data;
+  const { risks, assessments, criteria, soa, documents, nonconformities } = data;
   const risksConfirmed = risks.length > 0 && risks.every((risk) => risk.confirmation);
 
   return [
@@ -134,7 +146,7 @@ export function readinessGroups(data: ReadinessData): ReadinessGroup[] {
           ref: '10.2',
           title: 'Nonconformities handled',
           where: { label: 'Nonconformities', to: '/nonconformities' },
-          state: 'Missing',
+          state: nonconformitiesState(nonconformities, documents),
         },
       ],
     },

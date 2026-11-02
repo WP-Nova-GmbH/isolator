@@ -148,6 +148,25 @@ function describeIncidentChange(before: Value, after: Value) {
   return changes.join('. ');
 }
 
+function describeNonconformityChange(before: Value, after: Value) {
+  const changes: string[] = [];
+  if (before.title !== after.title) changes.push(`Title changed to “${String(after.title)}”`);
+  if (before.description !== after.description) changes.push('Details changed');
+  if (before.foundIn !== after.foundIn) {
+    changes.push(`Found in changed to “${String(after.foundIn)}”`);
+  }
+  if (before.foundOn !== after.foundOn) {
+    changes.push(`Found on changed to ${String(after.foundOn)}`);
+  }
+  if (before.ownerName !== after.ownerName) {
+    changes.push(`Owner changed to ${String(after.ownerName)}`);
+  }
+  if (before.cause !== after.cause) {
+    changes.push(before.cause ? 'Cause changed' : `Cause recorded: ${String(after.cause)}`);
+  }
+  return changes.join('. ');
+}
+
 interface FileEntry {
   title: string;
   upload: { name: string; sha256: string } | null;
@@ -276,6 +295,16 @@ export function describeEvent({ action, recordLabel, before, after }: AuditEvent
       return 'Incident reopened';
     case 'incident.deleted':
       return 'Incident deleted';
+    case 'nonconformity.added':
+      return 'Nonconformity added';
+    case 'nonconformity.changed':
+      return describeNonconformityChange(before!, after!);
+    case 'nonconformity.closed':
+      return 'Nonconformity closed';
+    case 'nonconformity.reopened':
+      return 'Nonconformity reopened';
+    case 'nonconformity.deleted':
+      return 'Nonconformity deleted';
     case 'soa.own_control_added':
       return 'Own control added';
     case 'soa.changed':
@@ -332,6 +361,9 @@ export function recordPath({ recordType, recordRef, recordId, action }: AuditEve
   if (recordType === 'risk_assessment') return '/risks/assessments';
   if (recordType === 'supplier' && action !== 'supplier.deleted') return `/suppliers/${recordRef}`;
   if (recordType === 'incident' && action !== 'incident.deleted') return `/incidents/${recordRef}`;
+  if (recordType === 'nonconformity' && action !== 'nonconformity.deleted') {
+    return `/nonconformities/${recordRef}`;
+  }
   if (recordType === 'asset' && action !== 'asset.deleted') return `/assets/${recordId}`;
   if (recordType === 'soa_entry') return `/soa/${recordRef}`;
   if (recordType === 'document' && action !== 'document.deleted') return `/documents/${recordId}`;

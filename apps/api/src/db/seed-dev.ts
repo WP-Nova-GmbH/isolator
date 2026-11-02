@@ -12,6 +12,7 @@ import {
   evidence,
   incidents,
   members,
+  nonconformities,
   organizations,
   riskAssessments,
   riskAssets,
@@ -26,6 +27,7 @@ import {
   users,
 } from './schema';
 import { formatIncidentRef } from '../incidents/incidents.service';
+import { formatNonconformityRef } from '../nonconformities/nonconformities.service';
 import { formatRiskRef, type RiskDecision, type RiskTreatment } from '../risks/risk-decision';
 import { formatSupplierRef } from '../suppliers/supplier-rules';
 
@@ -326,6 +328,27 @@ const sampleIncidents = [
   },
 ];
 
+const sampleNonconformities = [
+  {
+    number: 1,
+    title: 'Admin sign-ins are not reviewed',
+    description: 'Nobody looks at admin sign-ins, so the alert in INC-002 was the first we knew.',
+    foundIn: 'Incident INC-002',
+    foundOn: '2026-09-11',
+    cause: 'Nobody was given the job when the alerts were turned on.',
+    owner: 'Jonas Weber',
+  },
+  {
+    number: 2,
+    title: 'GitHub contract has no data deletion terms',
+    description: 'The contract doesn’t say what happens to our code when the contract ends.',
+    foundIn: 'Supplier review of GitHub',
+    foundOn: '2026-10-08',
+    cause: '',
+    owner: 'Anna Keller',
+  },
+];
+
 const sampleTasks: {
   title: string;
   owner: string;
@@ -334,8 +357,10 @@ const sampleTasks: {
   control?: string;
   supplier?: string;
   incident?: number;
+  nonconformity?: number;
   done?: boolean;
 }[] = [
+  { title: 'Add sign-in alerts for admin accounts', owner: 'Jonas Weber', dueOn: '2026-11-28', nonconformity: 1 },
   { title: 'Turn on multi-factor sign-in for all staff', owner: 'Anna Keller', dueOn: '2026-09-15', risk: 5, done: true },
   { title: 'Test restoring the file storage backup', owner: 'Lea Fischer', dueOn: '2026-10-28', control: 'A.8.13' },
   { title: 'Run the access review for the fourth quarter', owner: 'Anna Keller', dueOn: '2026-10-30', control: 'A.5.15' },
@@ -706,6 +731,34 @@ async function main() {
       }
     }
 
+    const nonconformityIds = new Map<number, string>();
+    for (const { owner, ...sample } of sampleNonconformities) {
+      const [nonconformity] = await tx
+        .insert(nonconformities)
+        .values({ ...sample, organizationId, ownerId: memberId(owner) })
+        .returning();
+      nonconformityIds.set(sample.number, nonconformity.id);
+      await tx.insert(auditEvents).values({
+        organizationId,
+        recordType: 'nonconformity',
+        recordId: nonconformity.id,
+        recordRef: formatNonconformityRef(nonconformity.number),
+        recordLabel: nonconformity.title,
+        memberId: memberId(owner),
+        memberName: owner,
+        action: 'nonconformity.added',
+        after: {
+          title: sample.title,
+          description: sample.description,
+          foundIn: sample.foundIn,
+          foundOn: sample.foundOn,
+          cause: sample.cause,
+          ownerName: owner,
+        },
+        occurredAt: new Date(sample.foundOn),
+      });
+    }
+
     await tx.insert(tasks).values(
       sampleTasks.map((task) => ({
         organizationId,
@@ -717,6 +770,7 @@ async function main() {
         soaEntryId: task.control ? entryIds.get(task.control) : null,
         supplierId: task.supplier ? supplierIds.get(task.supplier) : null,
         incidentId: task.incident ? incidentIds.get(task.incident) : null,
+        nonconformityId: task.nonconformity ? nonconformityIds.get(task.nonconformity) : null,
       })),
     );
 

@@ -689,6 +689,46 @@ export const riskAssessments = pgTable(
 );
 
 // Follow-up work, linked to the risk, SoA entry, Supplier or Incident it belongs to.
+export const nonconformities = pgTable(
+  'nonconformities',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    // Shown as NC-001. Counts up per Organization and is never reused.
+    number: integer('number').notNull(),
+    title: text('title').notNull(),
+    description: text('description').notNull().default(''),
+    // Where it came to light, such as an internal audit or a Supplier review.
+    foundIn: text('found_in').notNull(),
+    foundOn: date('found_on').notNull(),
+    // Why it happened. It can't be closed until someone has said.
+    cause: text('cause').notNull().default(''),
+    ownerId: uuid('owner_id').notNull(),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    closedById: uuid('closed_by_id'),
+    closedReason: text('closed_reason'),
+    // A deleted Nonconformity was recorded by mistake. The row stays for the Audit trail.
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('nonconformities_org_number_idx').on(t.organizationId, t.number),
+    unique('nonconformities_org_id_unique').on(t.organizationId, t.id),
+    foreignKey({
+      name: 'nonconformities_owner_fk',
+      columns: [t.organizationId, t.ownerId],
+      foreignColumns: [members.organizationId, members.id],
+    }),
+    foreignKey({
+      name: 'nonconformities_closed_by_fk',
+      columns: [t.organizationId, t.closedById],
+      foreignColumns: [members.organizationId, members.id],
+    }),
+  ],
+);
+
 export const tasks = pgTable(
   'tasks',
   {
@@ -707,6 +747,7 @@ export const tasks = pgTable(
     soaEntryId: uuid('soa_entry_id'),
     supplierId: uuid('supplier_id'),
     incidentId: uuid('incident_id'),
+    nonconformityId: uuid('nonconformity_id'),
     ...timestamps,
   },
   (t) => [
@@ -735,6 +776,11 @@ export const tasks = pgTable(
       name: 'tasks_incident_fk',
       columns: [t.organizationId, t.incidentId],
       foreignColumns: [incidents.organizationId, incidents.id],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'tasks_nonconformity_fk',
+      columns: [t.organizationId, t.nonconformityId],
+      foreignColumns: [nonconformities.organizationId, nonconformities.id],
     }).onDelete('cascade'),
   ],
 );

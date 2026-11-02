@@ -23,6 +23,7 @@ const tones = {
   },
   supplierReview: { 'No concerns': 'success', Concerns: 'warning', 'Stop using': 'danger' },
   incident: { Investigating: 'warning', Closed: 'neutral' },
+  nonconformity: { Open: 'danger', Closed: 'neutral' },
   assessment: { 'In progress': 'info', Planned: 'neutral', Completed: 'success' },
 } as const;
 

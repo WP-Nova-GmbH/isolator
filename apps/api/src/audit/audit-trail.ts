@@ -12,6 +12,7 @@ export type AuditRecordType =
   | 'supplier'
   | 'asset'
   | 'incident'
+  | 'nonconformity'
   | 'file'
   | 'soa_entry'
   | 'document'
@@ -53,6 +54,11 @@ export type AuditAction =
   | 'incident.closed'
   | 'incident.reopened'
   | 'incident.deleted'
+  | 'nonconformity.added'
+  | 'nonconformity.changed'
+  | 'nonconformity.closed'
+  | 'nonconformity.reopened'
+  | 'nonconformity.deleted'
   | 'soa.own_control_added'
   | 'soa.changed'
   | 'soa.confirmed'
@@ -97,6 +103,7 @@ const areas: Record<string, AuditRecordType[]> = {
   soa: ['soa_entry'],
   documents: ['document'],
   incidents: ['incident'],
+  nonconformities: ['nonconformity'],
   members: ['member', 'organization'],
 };
 

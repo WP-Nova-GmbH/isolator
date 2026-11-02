@@ -4,6 +4,7 @@ import { AuditTrailService } from '../audit/audit-trail';
 import { createDb } from '../db/client';
 import { members, organizations, users } from '../db/schema';
 import type { CurrentMember } from '../members/current-member';
+import { NonconformitiesService } from '../nonconformities/nonconformities.service';
 import { RiskCriteriaService } from '../risks/risk-criteria.service';
 import { RisksService } from '../risks/risks.service';
 import { SoaService } from '../soa/soa.service';
@@ -22,6 +23,7 @@ const tasks = new TasksService(
   risks,
   new SuppliersService(db, trail, testFiles(db).files),
   incidents,
+  new NonconformitiesService(db, trail),
   new SoaService(db, trail),
 );
 

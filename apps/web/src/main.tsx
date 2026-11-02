@@ -29,7 +29,13 @@ import { IncidentNew, incidentNewAction, incidentNewLoader } from './routes/inci
 import { Incidents, incidentsLoader } from './routes/incidents';
 import { Layout } from './routes/layout';
 import { Members, membersAction, membersLoader } from './routes/members';
-import { Nonconformities } from './routes/nonconformities';
+import { Nonconformities, nonconformitiesLoader } from './routes/nonconformities';
+import {
+  NonconformityDetail,
+  nonconformityDetailAction,
+  nonconformityDetailLoader,
+} from './routes/nonconformity-detail';
+import { NonconformityNew, nonconformityNewAction } from './routes/nonconformity-new';
 import { NotFound } from './routes/not-found';
 import { Organizations, organizationsAction, organizationsLoader } from './routes/organizations';
 import { Overview, overviewLoader } from './routes/overview';
@@ -137,7 +143,18 @@ const router = createBrowserRouter([
             action: incidentDetailAction,
             element: <IncidentDetail />,
           },
-          { path: 'nonconformities', element: <Nonconformities /> },
+          { path: 'nonconformities', loader: nonconformitiesLoader, element: <Nonconformities /> },
+          {
+            path: 'nonconformities/new',
+            action: nonconformityNewAction,
+            element: <NonconformityNew />,
+          },
+          {
+            path: 'nonconformities/:ref',
+            loader: nonconformityDetailLoader,
+            action: nonconformityDetailAction,
+            element: <NonconformityDetail />,
+          },
           { path: 'documents', loader: documentsLoader, element: <Documents /> },
           { path: 'documents/new', action: documentNewAction, element: <DocumentNew /> },
           {

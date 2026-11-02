@@ -42,7 +42,7 @@
 
 **Incident** – an information security event that has happened and needs handling. A risk is what could happen; an incident is what did. It is closed with how it was resolved, and stays on record.
 
-**Nonconformity** – a failure to meet a requirement of the standard or of the Organization's own ISMS, found for example in an internal audit.
+**Nonconformity** – a failure to meet a requirement of the standard or of the Organization's own ISMS, found for example in an internal audit. The Tasks that correct it belong to it. It closes once its cause is recorded, its Tasks are finished, and a Member says how they know it is fixed.
 
 **Task** – follow-up work with an owner and a due date, linked to the risk, Nonconformity, control, Supplier or Incident it belongs to. A Task that is no longer needed is cancelled with a reason, and stays on record.
 
