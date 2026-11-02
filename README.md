@@ -2,7 +2,7 @@
 
 Self-hosted ISMS for mid-sized businesses going for their first ISO/IEC 27001:2022 certificate and keeping it afterwards: risks, assets, suppliers, the Statement of Applicability, documents, evidence and audit preparation. Every step works by hand, and automated scans and AI come later.
 
-See [docs/roadmap.md](docs/roadmap.md) for scope and phases, [CONTEXT.md](CONTEXT.md) for domain context, [docs/design-system.md](docs/design-system.md) for the logo, tokens and UI rules.
+See [docs/roadmap.md](docs/roadmap.md) for scope and phases, [CONTEXT.md](CONTEXT.md) for domain context, [docs/design-system.md](docs/design-system.md) for the logo, tokens and UI rules, [docs/deployment.md](docs/deployment.md) to run it in production.
 
 ## Layout
 
@@ -48,48 +48,7 @@ npm run auth:reset-password -w api -- someone@example.com
 
 ## Production
 
-One container serves the API and the web app on port 3000, so both share an address, which sign-in needs because it uses a cookie. Postgres runs outside the container.
-
-Build the image, then publish it to the registry set in `scripts/.env`:
-
-```sh
-cp scripts/.env.example scripts/.env
-npm run create-docker-image             # for this machine, to try it locally
-npm run create-docker-image -- --push   # publishes amd64 and arm64
-```
-
-The image is tagged `latest` and with `version` from `package.json`. Publishing the same version again replaces it, so release a new version first:
-
-```sh
-npm run release   # bumps the version, updates CHANGELOG.md, commits and tags it
-```
-
-Commits since the last `isolator-*` tag set the version: `fix` raises the patch version, `feat` the minor version, and "breaking change" in a commit body the major version. Other types don't start a release. Use `npm run release -- --releaseAs=patch` to choose, or `--dry-run` to see what it would do.
-
-To run it, put the settings in a file. `BETTER_AUTH_URL` is the address people open Isolator at, and changing `BETTER_AUTH_SECRET` signs everyone out. [.env.example](apps/api/.env.example) lists the optional S3 and ClamAV settings.
-
-```sh
-# isolator.env
-DATABASE_URL=postgres://isolator:password@db.example.com:5432/isolator?sslmode=require
-BETTER_AUTH_URL=https://isolator.example.com
-BETTER_AUTH_SECRET=   # openssl rand -base64 32
-```
-
-```sh
-docker run -d --name isolator --restart unless-stopped \
-  --env-file isolator.env \
-  -p 127.0.0.1:3000:3000 \
-  -v isolator_storage:/data/storage \
-  wp-containerz.cr.de-fra.ionos.com/isolator:0.1.0
-```
-
-- Put it behind a proxy that handles HTTPS and sets `X-Forwarded-For`, which the sign-in rate limit reads.
-- Each start migrates the database and loads the control catalog before the API starts. Run one container at a time.
-- Uploads stay in `/data/storage`, so keep that volume and back it up, or set `S3_BUCKET`.
-- `docker logs isolator` shows the setup token until the install is claimed.
-- To reset a password: `docker exec isolator node dist/src/auth/reset-password.js someone@example.com`
-
-See [ADR 0004](docs/adr/0004-self-hostable-with-own-auth.md).
+One container serves the API and the web app, and Postgres runs outside it. [docs/deployment.md](docs/deployment.md) covers setting up a server, upgrading, backups and publishing a new version.
 
 ## License
 
