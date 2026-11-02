@@ -124,12 +124,22 @@ export class FilesService {
       this.db
         .select({ id: supplierFiles.id })
         .from(supplierFiles)
-        .where(eq(supplierFiles.storedFileId, id)),
-      this.db.select({ id: evidence.id }).from(evidence).where(eq(evidence.storedFileId, id)),
+        .where(
+          and(eq(supplierFiles.organizationId, organizationId), eq(supplierFiles.storedFileId, id)),
+        ),
+      this.db
+        .select({ id: evidence.id })
+        .from(evidence)
+        .where(and(eq(evidence.organizationId, organizationId), eq(evidence.storedFileId, id))),
       this.db
         .select({ id: documentVersions.id })
         .from(documentVersions)
-        .where(eq(documentVersions.storedFileId, id)),
+        .where(
+          and(
+            eq(documentVersions.organizationId, organizationId),
+            eq(documentVersions.storedFileId, id),
+          ),
+        ),
     ]);
     if (links.some((rows) => rows.length > 0)) {
       throw new ConflictException('This file is in use.');
@@ -139,7 +149,9 @@ export class FilesService {
 
   /** Deletes the row and the bytes. The Audit trail keeps the name, size and hash. */
   async discard(file: typeof storedFiles.$inferSelect) {
-    await this.db.delete(storedFiles).where(eq(storedFiles.id, file.id));
+    await this.db
+      .delete(storedFiles)
+      .where(and(eq(storedFiles.organizationId, file.organizationId), eq(storedFiles.id, file.id)));
     try {
       await this.storages.of(file.driver).delete(file.storageKey);
     } catch (error) {

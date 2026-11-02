@@ -138,7 +138,12 @@ export class SuppliersService {
         .select({ file: supplierFiles, stored: storedFiles })
         .from(supplierFiles)
         .leftJoin(storedFiles, eq(storedFiles.id, supplierFiles.storedFileId))
-        .where(eq(supplierFiles.supplierId, supplierId))
+        .where(
+          and(
+            eq(supplierFiles.organizationId, organizationId),
+            eq(supplierFiles.supplierId, supplierId),
+          ),
+        )
         .orderBy(asc(supplierFiles.kind), desc(supplierFiles.datedOn)),
       this.reviews(organizationId, supplierId),
       this.db
@@ -167,6 +172,7 @@ export class SuppliersService {
         .innerJoin(risks, eq(risks.id, riskAssets.riskId))
         .where(
           and(
+            eq(riskAssets.organizationId, organizationId),
             eq(assets.supplierId, supplierId),
             isNull(risks.closedAt),
             isNull(risks.deletedAt),
@@ -248,7 +254,7 @@ export class SuppliersService {
 
   async end(member: CurrentMember, ref: string, reason: string) {
     const row = await this.findActive(member.organizationId, ref);
-    await this.assertNoAssets(row.supplier.id);
+    await this.assertNoAssets(member.organizationId, row.supplier.id);
     await assertNoOpenTasks(this.db, member, eq(tasks.supplierId, row.supplier.id));
     await this.db.transaction(async (tx) => {
       await tx
@@ -290,18 +296,28 @@ export class SuppliersService {
       this.db
         .select({ reviews: count() })
         .from(supplierReviews)
-        .where(eq(supplierReviews.supplierId, row.supplier.id)),
+        .where(
+          and(
+            eq(supplierReviews.organizationId, member.organizationId),
+            eq(supplierReviews.supplierId, row.supplier.id),
+          ),
+        ),
       this.db
         .select({ files: count() })
         .from(supplierFiles)
-        .where(eq(supplierFiles.supplierId, row.supplier.id)),
+        .where(
+          and(
+            eq(supplierFiles.organizationId, member.organizationId),
+            eq(supplierFiles.supplierId, row.supplier.id),
+          ),
+        ),
     ]);
     if (reviews + files > 0) {
       throw new ConflictException(
         'This Supplier has reviews or files on record, so it stays. End it instead.',
       );
     }
-    await this.assertNoAssets(row.supplier.id);
+    await this.assertNoAssets(member.organizationId, row.supplier.id);
     await assertNoOpenTasks(this.db, member, eq(tasks.supplierId, row.supplier.id));
     await this.db.transaction(async (tx) => {
       await tx
@@ -564,11 +580,11 @@ export class SuppliersService {
     };
   }
 
-  private async assertNoAssets(supplierId: string) {
+  private async assertNoAssets(organizationId: string, supplierId: string) {
     const [{ linked }] = await this.db
       .select({ linked: count() })
       .from(assets)
-      .where(eq(assets.supplierId, supplierId));
+      .where(and(eq(assets.organizationId, organizationId), eq(assets.supplierId, supplierId)));
     if (linked > 0) {
       throw new ConflictException(
         linked === 1

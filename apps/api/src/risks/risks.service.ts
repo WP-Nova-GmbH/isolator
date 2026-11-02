@@ -82,13 +82,15 @@ export class RisksService {
         .select({ id: assets.id, name: assets.name })
         .from(riskAssets)
         .innerJoin(assets, eq(assets.id, riskAssets.assetId))
-        .where(eq(riskAssets.riskId, riskId))
+        .where(and(eq(riskAssets.organizationId, organizationId), eq(riskAssets.riskId, riskId)))
         .orderBy(asc(assets.name)),
       this.db
         .select({ id: controls.id, ref: controls.ref, title: controls.title })
         .from(riskControls)
         .innerJoin(controls, eq(controls.id, riskControls.controlId))
-        .where(eq(riskControls.riskId, riskId)),
+        .where(
+          and(eq(riskControls.organizationId, organizationId), eq(riskControls.riskId, riskId)),
+        ),
       this.trail.forRecord(organizationId, riskId),
     ]);
     return {
@@ -270,7 +272,10 @@ export class RisksService {
   async unlinkAsset(member: CurrentMember, ref: string, assetId: string) {
     const { organizationId } = member;
     const { row } = await this.findOpen(organizationId, ref);
-    const [asset] = await this.db.select({ name: assets.name }).from(assets).where(eq(assets.id, assetId));
+    const [asset] = await this.db
+      .select({ name: assets.name })
+      .from(assets)
+      .where(and(eq(assets.organizationId, organizationId), eq(assets.id, assetId)));
     await this.db.transaction(async (tx) => {
       const unlinked = await tx
         .delete(riskAssets)

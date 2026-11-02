@@ -175,6 +175,17 @@ describe('Confirmations', () => {
 });
 
 describe('tenancy', () => {
+  it('ignores another Organization’s asset when unlinking', async () => {
+    const a = await organization();
+    const b = await organization();
+    const { ref } = await risks.create(a.owner, input(a.owner.id));
+    await risks.linkAsset(a.owner, ref, a.asset.id);
+    await risks.unlinkAsset(a.owner, ref, b.asset.id);
+    const { assets: linked, history } = await risks.get(a.id, ref);
+    expect(linked).toMatchObject([{ id: a.asset.id }]);
+    expect(history[0].action).toBe('risk.asset_linked');
+  });
+
   it('hides one Organization’s risks from another', async () => {
     const a = await organization();
     const b = await organization();

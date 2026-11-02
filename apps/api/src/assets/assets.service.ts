@@ -75,10 +75,20 @@ export class AssetsService {
         .select({ number: risks.number, title: risks.title })
         .from(riskAssets)
         .innerJoin(risks, eq(risks.id, riskAssets.riskId))
-        .where(and(eq(riskAssets.assetId, id), isNull(risks.closedAt), isNull(risks.deletedAt)))
+        .where(
+          and(
+            eq(riskAssets.organizationId, organizationId),
+            eq(riskAssets.assetId, id),
+            isNull(risks.closedAt),
+            isNull(risks.deletedAt),
+          ),
+        )
         .orderBy(asc(risks.number)),
       this.trail.forRecord(organizationId, id),
-      this.db.select({ everLinked: count() }).from(riskAssets).where(eq(riskAssets.assetId, id)),
+      this.db
+        .select({ everLinked: count() })
+        .from(riskAssets)
+        .where(and(eq(riskAssets.organizationId, organizationId), eq(riskAssets.assetId, id))),
     ]);
     return {
       id,
@@ -171,7 +181,14 @@ export class AssetsService {
       .select({ open: count() })
       .from(riskAssets)
       .innerJoin(risks, eq(risks.id, riskAssets.riskId))
-      .where(and(eq(riskAssets.assetId, id), isNull(risks.closedAt), isNull(risks.deletedAt)));
+      .where(
+        and(
+          eq(riskAssets.organizationId, organizationId),
+          eq(riskAssets.assetId, id),
+          isNull(risks.closedAt),
+          isNull(risks.deletedAt),
+        ),
+      );
     if (open > 0) {
       throw new ConflictException(
         open === 1
@@ -225,7 +242,7 @@ export class AssetsService {
     const [{ linked }] = await this.db
       .select({ linked: count() })
       .from(riskAssets)
-      .where(eq(riskAssets.assetId, id));
+      .where(and(eq(riskAssets.organizationId, organizationId), eq(riskAssets.assetId, id)));
     if (linked > 0) {
       throw new ConflictException('A risk points at this asset, so it stays on record. Retire it.');
     }

@@ -132,7 +132,9 @@ export class EvidenceService {
         .select({ entry: soaEntries, control: controls })
         .from(soaEntries)
         .leftJoin(controls, eq(controls.id, soaEntries.controlId))
-        .where(eq(soaEntries.id, item.soaEntryId));
+        .where(
+          and(eq(soaEntries.organizationId, organizationId), eq(soaEntries.id, item.soaEntryId)),
+        );
       const upload = item.storedFileId
         ? await this.files.find(organizationId, item.storedFileId)
         : null;

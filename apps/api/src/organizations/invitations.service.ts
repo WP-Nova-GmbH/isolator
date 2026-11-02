@@ -212,7 +212,9 @@ export class InvitationsService {
     await tx
       .update(invitations)
       .set({ acceptedAt: new Date() })
-      .where(eq(invitations.id, invitation.id));
+      .where(
+        and(eq(invitations.organizationId, organizationId), eq(invitations.id, invitation.id)),
+      );
     await recordEvent(tx, { id: member.id, organizationId, name: user.name }, {
       action: 'member.joined',
       recordType: 'member',

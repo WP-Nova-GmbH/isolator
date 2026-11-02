@@ -98,7 +98,7 @@ export class DocumentsService {
         .leftJoin(confirmer, eq(confirmer.id, documentVersions.confirmedById))
         .leftJoin(confirmerUser, eq(confirmerUser.id, confirmer.userId))
         .leftJoin(storedFiles, eq(storedFiles.id, documentVersions.storedFileId))
-        .where(eq(documentVersions.documentId, id))
+        .where(this.ofDocument(organizationId, id))
         .orderBy(desc(documentVersions.version)),
       this.trail.forRecord(organizationId, id),
       this.db
@@ -173,7 +173,7 @@ export class DocumentsService {
     const { organizationId } = member;
     const ownerName = await ownerNameOf(this.db, organizationId, input.ownerId);
     const row = await this.findActive(organizationId, id);
-    const latest = await this.latest(id);
+    const latest = await this.latest(organizationId, id);
     if (latest.confirmedAt && input.content !== latest.content) {
       throw new ConflictException('Start a new version to change the content.');
     }
@@ -194,7 +194,7 @@ export class DocumentsService {
         await tx
           .update(documentVersions)
           .set({ content: input.content })
-          .where(eq(documentVersions.id, latest.id));
+          .where(this.scopedVersion(organizationId, latest.id));
       }
       await recordEvent(tx, member, {
         action: 'document.changed',
@@ -210,7 +210,7 @@ export class DocumentsService {
   async setFile(member: CurrentMember, id: string, storedFileId: string | null) {
     const { organizationId } = member;
     const row = await this.findActive(organizationId, id);
-    const latest = await this.latest(id);
+    const latest = await this.latest(organizationId, id);
     if (latest.confirmedAt) throw new ConflictException('Start a new version to change the file.');
     const next = storedFileId ? await this.files.find(organizationId, storedFileId) : null;
     const previous = latest.storedFileId
@@ -222,7 +222,7 @@ export class DocumentsService {
       await tx
         .update(documentVersions)
         .set({ storedFileId })
-        .where(eq(documentVersions.id, latest.id));
+        .where(this.scopedVersion(organizationId, latest.id));
       await recordEvent(tx, member, {
         action: 'document.changed',
         ...this.record(row.document),
@@ -236,7 +236,7 @@ export class DocumentsService {
 
   async startVersion(member: CurrentMember, id: string) {
     const row = await this.findActive(member.organizationId, id);
-    const latest = await this.latest(id);
+    const latest = await this.latest(member.organizationId, id);
     if (!latest.confirmedAt) throw new ConflictException('This version is still a draft.');
     const version = latest.version + 1;
     await this.db.transaction(async (tx) => {
@@ -259,7 +259,7 @@ export class DocumentsService {
   /** Puts the draft in force. The last confirmed version is kept with it, as what it replaced. */
   async confirm(member: CurrentMember, id: string) {
     const row = await this.findActive(member.organizationId, id);
-    const versions = await this.versions(id);
+    const versions = await this.versions(member.organizationId, id);
     const [latest] = versions;
     if (latest.confirmedAt) throw new ConflictException('This version is already confirmed.');
     if (!latest.content.trim() && !latest.storedFileId) {
@@ -270,7 +270,7 @@ export class DocumentsService {
       await tx
         .update(documentVersions)
         .set({ confirmedAt: new Date(), confirmedById: member.id })
-        .where(eq(documentVersions.id, latest.id));
+        .where(this.scopedVersion(member.organizationId, latest.id));
       await recordEvent(tx, member, {
         action: 'document.confirmed',
         ...this.record(row.document),
@@ -320,7 +320,7 @@ export class DocumentsService {
   async delete(member: CurrentMember, id: string, reason: string) {
     const { organizationId } = member;
     const row = await this.findActive(organizationId, id);
-    const versions = await this.versions(id);
+    const versions = await this.versions(organizationId, id);
     if (versions.some((version) => version.confirmedAt)) {
       throw new ConflictException('This Document has a Confirmation, so it stays. Withdraw it.');
     }
@@ -342,7 +342,7 @@ export class DocumentsService {
       await tx
         .update(documentVersions)
         .set({ storedFileId: null })
-        .where(eq(documentVersions.documentId, id));
+        .where(this.ofDocument(organizationId, id));
       await recordEvent(tx, member, {
         action: 'document.deleted',
         ...this.record(row.document),
@@ -355,6 +355,17 @@ export class DocumentsService {
 
   private scoped(organizationId: string, id: string) {
     return and(eq(documents.organizationId, organizationId), eq(documents.id, id));
+  }
+
+  private scopedVersion(organizationId: string, id: string) {
+    return and(eq(documentVersions.organizationId, organizationId), eq(documentVersions.id, id));
+  }
+
+  private ofDocument(organizationId: string, documentId: string) {
+    return and(
+      eq(documentVersions.organizationId, organizationId),
+      eq(documentVersions.documentId, documentId),
+    );
   }
 
   private record(document: Pick<DocumentRow, 'id' | 'title'>) {
@@ -390,16 +401,16 @@ export class DocumentsService {
   }
 
   /** Newest first. Every Document has at least one version. */
-  private versions(documentId: string) {
+  private versions(organizationId: string, documentId: string) {
     return this.db
       .select()
       .from(documentVersions)
-      .where(eq(documentVersions.documentId, documentId))
+      .where(this.ofDocument(organizationId, documentId))
       .orderBy(desc(documentVersions.version));
   }
 
-  private async latest(documentId: string) {
-    const [latest] = await this.versions(documentId);
+  private async latest(organizationId: string, documentId: string) {
+    const [latest] = await this.versions(organizationId, documentId);
     return latest;
   }
 

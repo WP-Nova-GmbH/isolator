@@ -86,7 +86,7 @@ export class MembersService {
       await tx
         .update(members)
         .set({ removedAt: new Date(), removedReason: reason })
-        .where(eq(members.id, id));
+        .where(and(eq(members.organizationId, member.organizationId), eq(members.id, id)));
       await recordEvent(tx, member, {
         action: 'member.removed',
         recordType: 'member',
