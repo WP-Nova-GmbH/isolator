@@ -5,13 +5,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, asc, count, desc, eq, isNotNull, isNull, max, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, isNotNull, isNull, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
 import { AuditTrailService, recordEvent } from '../audit/audit-trail';
 import { DB, type Database } from '../db/db.module';
-import { members, nonconformities, organizations, tasks, users } from '../db/schema';
+import { nextNumber } from '../db/next-number';
+import { members, nonconformities, tasks, users } from '../db/schema';
 import type { CurrentMember } from '../members/current-member';
+import { ownerNameOf, ownerOnReturn } from '../members/owner-name';
 import { assertNoOpenTasks } from '../tasks/open-tasks';
 import { today } from '../validation';
 
@@ -32,7 +34,7 @@ export function formatNonconformityRef(number: number) {
   return `NC-${String(number).padStart(3, '0')}`;
 }
 
-export function parseNonconformityRef(ref: string) {
+function parseNonconformityRef(ref: string) {
   const match = /^NC-(\d+)$/.exec(ref);
   return match ? Number(match[1]) : null;
 }
@@ -60,12 +62,9 @@ export class NonconformitiesService {
 
   async get(organizationId: string, ref: string) {
     const row = await this.find(organizationId, ref);
-    const [history, [{ taskCount }]] = await Promise.all([
+    const [history, taskCount] = await Promise.all([
       this.trail.forRecord(organizationId, row.nonconformity.id),
-      this.db
-        .select({ taskCount: count() })
-        .from(tasks)
-        .where(eq(tasks.nonconformityId, row.nonconformity.id)),
+      this.taskCount(organizationId, row.nonconformity.id),
     ]);
     return {
       ...this.summary(row),
@@ -80,19 +79,9 @@ export class NonconformitiesService {
   async add(member: CurrentMember, input: NonconformityInput) {
     const { organizationId } = member;
     this.assertNotInFuture(input.foundOn);
-    const ownerName = await this.memberName(organizationId, input.ownerId);
+    const ownerName = await ownerNameOf(this.db, organizationId, input.ownerId);
     const number = await this.db.transaction(async (tx) => {
-      // Holds the Organization's row so two new records can't take the same number.
-      await tx
-        .select({ id: organizations.id })
-        .from(organizations)
-        .where(eq(organizations.id, organizationId))
-        .for('update');
-      const [{ highest }] = await tx
-        .select({ highest: max(nonconformities.number) })
-        .from(nonconformities)
-        .where(eq(nonconformities.organizationId, organizationId));
-      const next = (highest ?? 0) + 1;
+      const next = await nextNumber(tx, organizationId, nonconformities);
       const [nonconformity] = await tx
         .insert(nonconformities)
         .values({ ...input, organizationId, number: next })
@@ -110,7 +99,7 @@ export class NonconformitiesService {
   async update(member: CurrentMember, ref: string, input: NonconformityInput) {
     const { organizationId } = member;
     this.assertNotInFuture(input.foundOn);
-    const ownerName = await this.memberName(organizationId, input.ownerId);
+    const ownerName = await ownerNameOf(this.db, organizationId, input.ownerId);
     const row = await this.findOpen(organizationId, ref);
     const before = this.snapshot(row.nonconformity, row.ownerName);
     const after = this.snapshot(input, ownerName);
@@ -136,7 +125,7 @@ export class NonconformitiesService {
     if (!row.nonconformity.cause) {
       throw new ConflictException('Save what caused it before closing it.');
     }
-    await assertNoOpenTasks(this.db, eq(tasks.nonconformityId, row.nonconformity.id));
+    await assertNoOpenTasks(this.db, member, eq(tasks.nonconformityId, row.nonconformity.id));
     await this.db.transaction(async (tx) => {
       await tx
         .update(nonconformities)
@@ -156,14 +145,16 @@ export class NonconformitiesService {
     if (!row.nonconformity.closedAt) {
       throw new ConflictException('This Nonconformity is not closed.');
     }
+    const owner = await ownerOnReturn(this.db, member, row.nonconformity, row.ownerName);
     await this.db.transaction(async (tx) => {
       await tx
         .update(nonconformities)
-        .set({ closedAt: null, closedById: null, closedReason: null })
+        .set({ closedAt: null, closedById: null, closedReason: null, ownerId: owner.id })
         .where(this.scoped(member.organizationId, row.nonconformity.id));
       await recordEvent(tx, member, {
         action: 'nonconformity.reopened',
         ...this.record(row.nonconformity),
+        ...owner.change,
         reason,
       });
     });
@@ -172,12 +163,8 @@ export class NonconformitiesService {
 
   /** For a record made by mistake. The row and its trail stay; it leaves the register. */
   async delete(member: CurrentMember, ref: string, reason: string) {
-    const row = await this.find(member.organizationId, ref);
-    const [{ taskCount }] = await this.db
-      .select({ taskCount: count() })
-      .from(tasks)
-      .where(eq(tasks.nonconformityId, row.nonconformity.id));
-    if (taskCount > 0) {
+    const row = await this.findOpen(member.organizationId, ref);
+    if ((await this.taskCount(member.organizationId, row.nonconformity.id)) > 0) {
       throw new ConflictException(
         'This Nonconformity has Tasks on record, so it stays. Close it.',
       );
@@ -211,6 +198,14 @@ export class NonconformitiesService {
     if (foundOn > today()) {
       throw new BadRequestException('A Nonconformity is something already found.');
     }
+  }
+
+  private async taskCount(organizationId: string, id: string) {
+    const [{ total }] = await this.db
+      .select({ total: count() })
+      .from(tasks)
+      .where(and(eq(tasks.organizationId, organizationId), eq(tasks.nonconformityId, id)));
+    return total;
   }
 
   private scoped(organizationId: string, id: string) {
@@ -305,21 +300,5 @@ export class NonconformitiesService {
       closedReason: nonconformity.closedReason,
       state: nonconformity.closedAt ? 'Closed' : 'Open',
     };
-  }
-
-  private async memberName(organizationId: string, memberId: string) {
-    const [member] = await this.db
-      .select({ name: users.name })
-      .from(members)
-      .innerJoin(users, eq(users.id, members.userId))
-      .where(
-        and(
-          eq(members.organizationId, organizationId),
-          eq(members.id, memberId),
-          isNull(members.removedAt),
-        ),
-      );
-    if (!member) throw new BadRequestException('Choose an owner from your Members.');
-    return member.name;
   }
 }

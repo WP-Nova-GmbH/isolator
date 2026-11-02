@@ -4,6 +4,7 @@ import { AuditTrailService } from '../audit/audit-trail';
 import { createDb } from '../db/client';
 import { members, organizations, users } from '../db/schema';
 import type { CurrentMember } from '../members/current-member';
+import { MembersService } from '../members/members.service';
 import { RiskCriteriaService } from '../risks/risk-criteria.service';
 import { RisksService } from '../risks/risks.service';
 import { SuppliersService } from '../suppliers/suppliers.service';
@@ -17,26 +18,26 @@ const suppliers = new SuppliersService(db, trail, testFiles(db).files);
 const assets = new AssetsService(db, suppliers, trail);
 const risks = new RisksService(db, new RiskCriteriaService(db), trail);
 
+const membersService = new MembersService(db);
+
 afterAll(() => client.end());
+
+async function addMember(organizationId: string, name: string): Promise<CurrentMember> {
+  const [user] = await db
+    .insert(users)
+    .values({ name, email: `${randomUUID()}@example.com` })
+    .returning();
+  const [member] = await db.insert(members).values({ organizationId, userId: user.id }).returning();
+  return { id: member.id, organizationId, organizationName: 'Test', name, email: user.email };
+}
 
 async function organization() {
   const [row] = await db.insert(organizations).values({ name: 'Test' }).returning();
-  const [user] = await db
-    .insert(users)
-    .values({ name: 'Owner', email: `${randomUUID()}@example.com` })
-    .returning();
-  const [member] = await db
-    .insert(members)
-    .values({ organizationId: row.id, userId: user.id })
-    .returning();
-  const owner: CurrentMember = {
-    id: member.id,
-    organizationId: row.id,
-    organizationName: 'Test',
-    name: 'Owner',
-    email: user.email,
+  return {
+    id: row.id,
+    owner: await addMember(row.id, 'Owner'),
+    colleague: await addMember(row.id, 'Colleague'),
   };
-  return { id: row.id, owner };
 }
 
 function input(ownerId: string, overrides: Partial<AssetInput> = {}): AssetInput {
@@ -128,6 +129,22 @@ describe('retiring an asset', () => {
     await assets.reinstate(org.owner, id, 'Back in use');
     expect(await assets.get(org.id, id)).toMatchObject({ retiredAt: null, retiredReason: null });
   });
+
+  it('goes to whoever reinstates it if its owner has left', async () => {
+    const org = await organization();
+    const { id } = await assets.create(org.owner, input(org.colleague.id));
+    await assets.retire(org.owner, id, 'Gone');
+    await membersService.remove(org.owner, org.colleague.id, 'Left');
+    await assets.reinstate(org.owner, id, 'Back in use');
+
+    const record = await assets.get(org.id, id);
+    expect(record).toMatchObject({ ownerId: org.owner.id, ownerName: 'Owner' });
+    expect(record.history[0]).toMatchObject({
+      action: 'asset.reinstated',
+      before: { ownerName: 'Colleague' },
+      after: { ownerName: 'Owner' },
+    });
+  });
 });
 
 describe('deleting an asset', () => {
@@ -154,6 +171,13 @@ describe('deleting an asset', () => {
     await risks.close(org.owner, ref, 'Gone');
     await expect(assets.delete(org.owner, id, 'Mistake')).rejects.toThrow('stays on record');
     expect((await assets.get(org.id, id)).deletable).toBe(false);
+  });
+
+  it('is refused once it is retired', async () => {
+    const org = await organization();
+    const { id } = await assets.create(org.owner, input(org.owner.id));
+    await assets.retire(org.owner, id, 'Gone');
+    await expect(assets.delete(org.owner, id, 'Mistake')).rejects.toThrow('Reinstate');
   });
 });
 

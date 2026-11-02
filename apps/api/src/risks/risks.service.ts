@@ -6,16 +6,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, asc, count, desc, eq, inArray, isNotNull, isNull, max, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { AuditTrailService, recordEvent } from '../audit/audit-trail';
 import { DB, type Database } from '../db/db.module';
+import { nextNumber } from '../db/next-number';
 import {
   assets,
   auditEvents,
   controls,
   members,
-  organizations,
   riskAssets,
   riskControls,
   risks,
@@ -23,6 +23,7 @@ import {
   users,
 } from '../db/schema';
 import type { CurrentMember } from '../members/current-member';
+import { ownerNameOf, ownerOnReturn } from '../members/owner-name';
 import { assertNoOpenTasks } from '../tasks/open-tasks';
 import { RiskCriteriaService } from './risk-criteria.service';
 import {
@@ -104,19 +105,9 @@ export class RisksService {
   }
 
   async create(member: CurrentMember, input: RiskInput) {
-    const ownerName = await this.memberName(member.organizationId, input.ownerId);
+    const ownerName = await ownerNameOf(this.db, member.organizationId, input.ownerId);
     const number = await this.db.transaction(async (tx) => {
-      // Holds the Organization's row so two new risks can't take the same number.
-      await tx
-        .select({ id: organizations.id })
-        .from(organizations)
-        .where(eq(organizations.id, member.organizationId))
-        .for('update');
-      const [{ highest }] = await tx
-        .select({ highest: max(risks.number) })
-        .from(risks)
-        .where(eq(risks.organizationId, member.organizationId));
-      const next = (highest ?? 0) + 1;
+      const next = await nextNumber(tx, member.organizationId, risks);
       const [risk] = await tx
         .insert(risks)
         .values({ ...input, organizationId: member.organizationId, number: next })
@@ -132,7 +123,7 @@ export class RisksService {
   }
 
   async update(member: CurrentMember, ref: string, input: RiskInput) {
-    const ownerName = await this.memberName(member.organizationId, input.ownerId);
+    const ownerName = await ownerNameOf(this.db, member.organizationId, input.ownerId);
     const { row } = await this.findOpen(member.organizationId, ref);
     const before = this.snapshot(row.risk, row.ownerName);
     const after = this.snapshot(input, ownerName);
@@ -183,7 +174,7 @@ export class RisksService {
   async close(member: CurrentMember, ref: string, reason: string) {
     const { row } = await this.findOpen(member.organizationId, ref);
     this.assertOwner(row, member, 'close this risk');
-    await assertNoOpenTasks(this.db, eq(tasks.riskId, row.risk.id));
+    await assertNoOpenTasks(this.db, member, eq(tasks.riskId, row.risk.id));
     await this.db.transaction(async (tx) => {
       await tx
         .update(risks)
@@ -198,20 +189,26 @@ export class RisksService {
   async reopen(member: CurrentMember, ref: string, reason: string) {
     const { row } = await this.find(member.organizationId, ref);
     if (!row.risk.closedAt) throw new ConflictException('This risk is not closed.');
-    this.assertOwner(row, member, 'reopen this risk');
+    const owner = await ownerOnReturn(this.db, member, row.risk, row.ownerName);
+    if (owner.id === row.risk.ownerId) this.assertOwner(row, member, 'reopen this risk');
     await this.db.transaction(async (tx) => {
       await tx
         .update(risks)
-        .set({ closedAt: null, closedReason: null })
+        .set({ closedAt: null, closedReason: null, ownerId: owner.id })
         .where(this.scoped(member.organizationId, row.risk.id));
-      await recordEvent(tx, member, { action: 'risk.reopened', ...this.record(row.risk), reason });
+      await recordEvent(tx, member, {
+        action: 'risk.reopened',
+        ...this.record(row.risk),
+        ...owner.change,
+        reason,
+      });
     });
     return { ref };
   }
 
   /** For a draft entered by mistake. The record and its trail stay; the risk leaves the register. */
   async delete(member: CurrentMember, ref: string, reason: string) {
-    const { row } = await this.find(member.organizationId, ref);
+    const { row } = await this.findOpen(member.organizationId, ref);
     const [{ confirmations }] = await this.db
       .select({ confirmations: count() })
       .from(auditEvents)
@@ -225,7 +222,7 @@ export class RisksService {
     if (confirmations > 0) {
       throw new ConflictException('This risk has a Confirmation, so it stays on record. Close it.');
     }
-    await assertNoOpenTasks(this.db, eq(tasks.riskId, row.risk.id));
+    await assertNoOpenTasks(this.db, member, eq(tasks.riskId, row.risk.id));
     await this.db.transaction(async (tx) => {
       await tx
         .update(risks)
@@ -462,15 +459,5 @@ export class RisksService {
     if (risk.ownerId !== member.id) {
       throw new ForbiddenException(`Only ${ownerName}, the risk owner, can ${action}.`);
     }
-  }
-
-  private async memberName(organizationId: string, memberId: string) {
-    const [member] = await this.db
-      .select({ name: users.name })
-      .from(members)
-      .innerJoin(users, eq(users.id, members.userId))
-      .where(and(eq(members.organizationId, organizationId), eq(members.id, memberId)));
-    if (!member) throw new BadRequestException('Choose a risk owner from your Members.');
-    return member.name;
   }
 }

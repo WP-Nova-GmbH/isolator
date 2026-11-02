@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -22,6 +21,7 @@ import {
 } from '../db/schema';
 import { FilesService } from '../files/files.service';
 import type { CurrentMember } from '../members/current-member';
+import { ownerNameOf, ownerOnReturn } from '../members/owner-name';
 import { soaRef, soaTitle } from '../soa/soa.service';
 
 export const documentInput = z.object({
@@ -141,7 +141,7 @@ export class DocumentsService {
 
   async create(member: CurrentMember, input: DocumentInput) {
     const { organizationId } = member;
-    const ownerName = await this.memberName(organizationId, input.ownerId);
+    const ownerName = await ownerNameOf(this.db, organizationId, input.ownerId);
     return this.db.transaction(async (tx) => {
       const [document] = await tx
         .insert(documents)
@@ -171,7 +171,7 @@ export class DocumentsService {
   /** The text can only change on a draft: a confirmed version stays as it was confirmed. */
   async update(member: CurrentMember, id: string, input: DocumentInput) {
     const { organizationId } = member;
-    const ownerName = await this.memberName(organizationId, input.ownerId);
+    const ownerName = await ownerNameOf(this.db, organizationId, input.ownerId);
     const row = await this.findActive(organizationId, id);
     const latest = await this.latest(id);
     if (latest.confirmedAt && input.content !== latest.content) {
@@ -300,14 +300,16 @@ export class DocumentsService {
   async reinstate(member: CurrentMember, id: string, reason: string) {
     const row = await this.find(member.organizationId, id);
     if (!row.document.withdrawnAt) throw new ConflictException('This Document is not withdrawn.');
+    const owner = await ownerOnReturn(this.db, member, row.document, row.ownerName);
     await this.db.transaction(async (tx) => {
       await tx
         .update(documents)
-        .set({ withdrawnAt: null, withdrawnReason: null })
+        .set({ withdrawnAt: null, withdrawnReason: null, ownerId: owner.id })
         .where(this.scoped(member.organizationId, id));
       await recordEvent(tx, member, {
         action: 'document.reinstated',
         ...this.record(row.document),
+        ...owner.change,
         reason,
       });
     });
@@ -317,7 +319,7 @@ export class DocumentsService {
   /** For a Document made by mistake. The record and its trail stay; it leaves the list. */
   async delete(member: CurrentMember, id: string, reason: string) {
     const { organizationId } = member;
-    const row = await this.find(organizationId, id);
+    const row = await this.findActive(organizationId, id);
     const versions = await this.versions(id);
     if (versions.some((version) => version.confirmedAt)) {
       throw new ConflictException('This Document has a Confirmation, so it stays. Withdraw it.');
@@ -420,15 +422,5 @@ export class DocumentsService {
       withdrawnReason: document.withdrawnReason,
       state: document.withdrawnAt ? 'Withdrawn' : latest.confirmedAt ? 'Confirmed' : 'Draft',
     };
-  }
-
-  private async memberName(organizationId: string, memberId: string) {
-    const [member] = await this.db
-      .select({ name: users.name })
-      .from(members)
-      .innerJoin(users, eq(users.id, members.userId))
-      .where(and(eq(members.organizationId, organizationId), eq(members.id, memberId)));
-    if (!member) throw new BadRequestException('Choose an owner from your Members.');
-    return member.name;
   }
 }

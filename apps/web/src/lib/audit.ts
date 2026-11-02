@@ -216,6 +216,11 @@ function fileLabel({ title, upload }: FileEntry) {
 }
 
 /** One event as a sentence: the same words on a record's History and in the Audit trail. */
+/** If the owner had left, the record went to whoever brought it back. */
+function describeReturn(text: string, after: Value | null) {
+  return after ? `${text}. Owner changed to ${String(after.ownerName)}` : text;
+}
+
 export function describeEvent({ action, recordLabel, before, after }: AuditEvent) {
   const decision = after as unknown as RiskDecision;
   switch (action) {
@@ -232,7 +237,7 @@ export function describeEvent({ action, recordLabel, before, after }: AuditEvent
     case 'risk.closed':
       return 'Risk closed';
     case 'risk.reopened':
-      return 'Risk reopened';
+      return describeReturn('Risk reopened', after);
     case 'risk.deleted':
       return 'Risk deleted';
     case 'risk.asset_linked':
@@ -256,7 +261,7 @@ export function describeEvent({ action, recordLabel, before, after }: AuditEvent
     case 'supplier.ended':
       return 'Supplier ended';
     case 'supplier.resumed':
-      return 'Supplier resumed';
+      return describeReturn('Supplier resumed', after);
     case 'supplier.deleted':
       return 'Supplier deleted';
     case 'supplier.reviewed':
@@ -280,7 +285,7 @@ export function describeEvent({ action, recordLabel, before, after }: AuditEvent
     case 'asset.retired':
       return 'Asset retired';
     case 'asset.reinstated':
-      return 'Asset reinstated';
+      return describeReturn('Asset reinstated', after);
     case 'asset.deleted':
       return 'Asset deleted';
     case 'file.refused':
@@ -292,7 +297,7 @@ export function describeEvent({ action, recordLabel, before, after }: AuditEvent
     case 'incident.closed':
       return 'Incident closed';
     case 'incident.reopened':
-      return 'Incident reopened';
+      return describeReturn('Incident reopened', after);
     case 'incident.deleted':
       return 'Incident deleted';
     case 'nonconformity.added':
@@ -302,7 +307,7 @@ export function describeEvent({ action, recordLabel, before, after }: AuditEvent
     case 'nonconformity.closed':
       return 'Nonconformity closed';
     case 'nonconformity.reopened':
-      return 'Nonconformity reopened';
+      return describeReturn('Nonconformity reopened', after);
     case 'nonconformity.deleted':
       return 'Nonconformity deleted';
     case 'soa.own_control_added':
@@ -328,7 +333,7 @@ export function describeEvent({ action, recordLabel, before, after }: AuditEvent
     case 'document.withdrawn':
       return 'Document withdrawn';
     case 'document.reinstated':
-      return 'Document reinstated';
+      return describeReturn('Document reinstated', after);
     case 'document.deleted':
       return 'Document deleted';
     case 'member.invited':
@@ -345,8 +350,6 @@ export function describeEvent({ action, recordLabel, before, after }: AuditEvent
       return `Task added for ${String(after!.ownerName)}, due ${String(after!.dueOn)}`;
     case 'task.finished':
       return 'Task marked done';
-    case 'task.reopened':
-      return 'Task reopened';
     case 'task.cancelled':
       return 'Task cancelled';
     default:

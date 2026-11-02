@@ -10,7 +10,7 @@ import { FormError } from '@/components/form-error';
 import { IncidentFields } from '@/components/incident-fields';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
-import { api, ApiError } from '@/lib/api';
+import { api, refused } from '@/lib/api';
 import { incidentPayload } from '@/lib/incidents';
 import type { Risk } from '@/lib/risks';
 
@@ -20,16 +20,13 @@ export function incidentNewLoader() {
 
 export async function incidentNewAction({ request }: ActionFunctionArgs) {
   const form = await request.formData();
-  try {
+  return refused(async () => {
     const { ref } = await api<{ ref: string }>('/incidents', {
       method: 'POST',
       body: incidentPayload(form),
     });
     return redirect(`/incidents/${ref}`);
-  } catch (error) {
-    if (error instanceof ApiError && error.status < 500) return { error: error.message };
-    throw error;
-  }
+  });
 }
 
 export function IncidentNew() {

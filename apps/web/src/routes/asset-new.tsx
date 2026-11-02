@@ -10,7 +10,7 @@ import { AssetFields } from '@/components/asset-fields';
 import { FormError } from '@/components/form-error';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
-import { api, ApiError } from '@/lib/api';
+import { api, refused } from '@/lib/api';
 import { assetPayload } from '@/lib/assets';
 import type { Supplier } from '@/lib/suppliers';
 
@@ -20,13 +20,10 @@ export function assetNewLoader() {
 
 export async function assetNewAction({ request }: ActionFunctionArgs) {
   const form = await request.formData();
-  try {
+  return refused(async () => {
     await api('/assets', { method: 'POST', body: assetPayload(form) });
     return redirect('/assets');
-  } catch (error) {
-    if (error instanceof ApiError && error.status < 500) return { error: error.message };
-    throw error;
-  }
+  });
 }
 
 export function AssetNew() {

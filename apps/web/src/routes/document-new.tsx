@@ -9,21 +9,18 @@ import { DocumentFields } from '@/components/document-fields';
 import { FormError } from '@/components/form-error';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
-import { api, ApiError } from '@/lib/api';
+import { api, refused } from '@/lib/api';
 import { documentPayload } from '@/lib/documents';
 
 export async function documentNewAction({ request }: ActionFunctionArgs) {
   const form = await request.formData();
-  try {
+  return refused(async () => {
     const { id } = await api<{ id: string }>('/documents', {
       method: 'POST',
       body: documentPayload(form),
     });
     return redirect(`/documents/${id}`);
-  } catch (error) {
-    if (error instanceof ApiError && error.status < 500) return { error: error.message };
-    throw error;
-  }
+  });
 }
 
 export function DocumentNew() {

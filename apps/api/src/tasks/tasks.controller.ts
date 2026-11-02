@@ -6,13 +6,12 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
-  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { Member, MemberGuard, type CurrentMember } from '../members/current-member';
 import { parseBody, reasonInput } from '../validation';
-import { taskInput, TasksService, taskStateInput } from './tasks.service';
+import { taskInput, TasksService } from './tasks.service';
 
 @Controller('tasks')
 @UseGuards(MemberGuard)
@@ -51,12 +50,8 @@ export class TasksController {
     return this.tasks.cancel(member, id, parseBody(reasonInput, body).reason);
   }
 
-  @Put(':id/state')
-  setState(
-    @Member() member: CurrentMember,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: unknown,
-  ) {
-    return this.tasks.setDone(member, id, parseBody(taskStateInput, body).done);
+  @Post(':id/completion')
+  finish(@Member() member: CurrentMember, @Param('id', ParseUUIDPipe) id: string) {
+    return this.tasks.finish(member, id);
   }
 }

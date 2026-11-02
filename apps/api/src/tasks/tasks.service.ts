@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -22,6 +21,7 @@ import {
 } from '../db/schema';
 import { formatIncidentRef, IncidentsService } from '../incidents/incidents.service';
 import type { CurrentMember } from '../members/current-member';
+import { ownerNameOf } from '../members/owner-name';
 import {
   formatNonconformityRef,
   NonconformitiesService,
@@ -55,8 +55,6 @@ export const taskInput = z
       ].filter(Boolean).length === 1,
     { message: 'Choose what this Task belongs to.' },
   );
-
-export const taskStateInput = z.object({ done: z.boolean() });
 
 export type TaskInput = z.output<typeof taskInput>;
 
@@ -172,12 +170,7 @@ export class TasksService {
     const soaEntryId = input.soaRef
       ? (await this.soa.entry(organizationId, input.soaRef)).entry.id
       : null;
-    const [owner] = await this.db
-      .select({ name: users.name })
-      .from(members)
-      .innerJoin(users, eq(users.id, members.userId))
-      .where(and(eq(members.organizationId, organizationId), eq(members.id, input.ownerId)));
-    if (!owner) throw new BadRequestException('Choose an owner from your Members.');
+    const ownerName = await ownerNameOf(this.db, organizationId, input.ownerId);
     return this.db.transaction(async (tx) => {
       const [task] = await tx
         .insert(tasks)
@@ -204,7 +197,7 @@ export class TasksService {
           input.nonconformityRef ??
           input.soaRef,
         recordLabel: task.title,
-        after: { ownerName: owner.name, dueOn: task.dueOn },
+        after: { ownerName, dueOn: task.dueOn },
       });
       return { id: task.id };
     });
@@ -237,22 +230,23 @@ export class TasksService {
     });
   }
 
-  async setDone(member: CurrentMember, id: string, done: boolean) {
+  async finish(member: CurrentMember, id: string) {
     return this.db.transaction(async (tx) => {
       const [task] = await tx
         .update(tasks)
-        .set({ doneAt: done ? new Date() : null })
+        .set({ doneAt: new Date() })
         .where(
           and(
             eq(tasks.organizationId, member.organizationId),
             eq(tasks.id, id),
+            isNull(tasks.doneAt),
             isNull(tasks.cancelledAt),
           ),
         )
         .returning();
       if (!task) await this.refuse(tx, member.organizationId, id);
       await recordEvent(tx, member, {
-        action: done ? 'task.finished' : 'task.reopened',
+        action: 'task.finished',
         recordType: 'task',
         recordId: task.id,
         recordLabel: task.title,

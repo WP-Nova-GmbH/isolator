@@ -114,7 +114,7 @@ describe('Nonconformity register', () => {
     const { ref: other } = await nonconformities.add(org.owner, input(org.owner.id));
     await tasks.create(org.owner, task(org.owner.id, ref));
     const { id } = await tasks.create(org.owner, task(org.owner.id, ref));
-    await tasks.setDone(org.owner, id, true);
+    await tasks.finish(org.owner, id);
     await nonconformities.close(org.owner, other, 'Checked the next quarter’s review ran.');
 
     const open = await nonconformities.list(org.id, 'open');
@@ -187,7 +187,7 @@ describe('closing a Nonconformity', () => {
     const done = await tasks.create(org.owner, task(org.owner.id, ref));
     const cancelled = await tasks.create(org.owner, task(org.owner.id, ref));
     await expect(nonconformities.close(org.owner, ref, 'Fixed')).rejects.toThrow('2 open Tasks');
-    await tasks.setDone(org.owner, done.id, true);
+    await tasks.finish(org.owner, done.id);
     await tasks.cancel(org.owner, cancelled.id, 'No longer needed');
     await expect(nonconformities.close(org.owner, ref, 'Fixed')).resolves.toEqual({ ref });
   });
@@ -241,11 +241,18 @@ describe('deleting a Nonconformity', () => {
     const org = await organization();
     const { ref } = await nonconformities.add(org.owner, input(org.owner.id));
     const { id } = await tasks.create(org.owner, task(org.owner.id, ref));
-    await tasks.setDone(org.owner, id, true);
+    await tasks.finish(org.owner, id);
     await expect(nonconformities.get(org.id, ref)).resolves.toMatchObject({ deletable: false });
     await expect(nonconformities.delete(org.owner, ref, 'Mistake')).rejects.toThrow(
       'Tasks on record',
     );
+  });
+
+  it('is refused once it is closed', async () => {
+    const org = await organization();
+    const { ref } = await nonconformities.add(org.owner, input(org.owner.id));
+    await nonconformities.close(org.owner, ref, 'Fixed');
+    await expect(nonconformities.delete(org.owner, ref, 'Mistake')).rejects.toThrow('Reopen');
   });
 });
 
@@ -273,5 +280,33 @@ describe('removing a Member', () => {
     await expect(
       membersService.remove(org.owner, org.colleague.id, 'Left'),
     ).resolves.toBeUndefined();
+  });
+
+  it('stops them owning anything new', async () => {
+    const org = await organization();
+    const { ref } = await nonconformities.add(org.owner, input(org.owner.id));
+    await membersService.remove(org.owner, org.colleague.id, 'Left');
+    await expect(
+      nonconformities.add(org.owner, input(org.colleague.id)),
+    ).rejects.toThrow('Choose an owner');
+    await expect(tasks.create(org.owner, task(org.colleague.id, ref))).rejects.toThrow(
+      'Choose an owner',
+    );
+  });
+
+  it('gives a closed Nonconformity to whoever reopens it', async () => {
+    const org = await organization();
+    const { ref } = await nonconformities.add(org.owner, input(org.colleague.id));
+    await nonconformities.close(org.owner, ref, 'Fixed');
+    await membersService.remove(org.owner, org.colleague.id, 'Left');
+    await nonconformities.reopen(org.owner, ref, 'It came back');
+
+    const record = await nonconformities.get(org.id, ref);
+    expect(record).toMatchObject({ ownerId: org.owner.id, ownerName: 'Owner' });
+    expect(record.history[0]).toMatchObject({
+      action: 'nonconformity.reopened',
+      before: { ownerName: 'Colleague' },
+      after: { ownerName: 'Owner' },
+    });
   });
 });

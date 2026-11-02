@@ -78,7 +78,6 @@ export type AuditAction =
   | 'organization.renamed'
   | 'task.added'
   | 'task.finished'
-  | 'task.reopened'
   | 'task.cancelled';
 
 export type AuditValue = Record<string, unknown>;

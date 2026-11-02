@@ -5,13 +5,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, asc, count, desc, eq, isNotNull, isNull, max, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, isNotNull, isNull, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
 import { AuditTrailService, recordEvent } from '../audit/audit-trail';
 import { DB, type Database } from '../db/db.module';
-import { incidents, members, organizations, risks, tasks, users } from '../db/schema';
+import { nextNumber } from '../db/next-number';
+import { incidents, members, risks, tasks, users } from '../db/schema';
 import type { CurrentMember } from '../members/current-member';
+import { ownerNameOf, ownerOnReturn } from '../members/owner-name';
 import { formatRiskRef } from '../risks/risk-decision';
 import { RisksService } from '../risks/risks.service';
 import { assertNoOpenTasks } from '../tasks/open-tasks';
@@ -62,12 +64,9 @@ export class IncidentsService {
 
   async get(organizationId: string, ref: string) {
     const row = await this.find(organizationId, ref);
-    const [history, [{ taskCount }]] = await Promise.all([
+    const [history, taskCount] = await Promise.all([
       this.trail.forRecord(organizationId, row.incident.id),
-      this.db
-        .select({ taskCount: count() })
-        .from(tasks)
-        .where(eq(tasks.incidentId, row.incident.id)),
+      this.taskCount(organizationId, row.incident.id),
     ]);
     return {
       ...this.summary(row),
@@ -81,20 +80,10 @@ export class IncidentsService {
   async report(member: CurrentMember, input: IncidentInput) {
     const { organizationId } = member;
     this.assertNotInFuture(input.occurredOn);
-    const ownerName = await this.memberName(organizationId, input.ownerId);
+    const ownerName = await ownerNameOf(this.db, organizationId, input.ownerId);
     const riskId = input.riskRef ? await this.risks.idOf(organizationId, input.riskRef) : null;
     const number = await this.db.transaction(async (tx) => {
-      // Holds the Organization's row so two new Incidents can't take the same number.
-      await tx
-        .select({ id: organizations.id })
-        .from(organizations)
-        .where(eq(organizations.id, organizationId))
-        .for('update');
-      const [{ highest }] = await tx
-        .select({ highest: max(incidents.number) })
-        .from(incidents)
-        .where(eq(incidents.organizationId, organizationId));
-      const next = (highest ?? 0) + 1;
+      const next = await nextNumber(tx, organizationId, incidents);
       const [incident] = await tx
         .insert(incidents)
         .values({
@@ -120,7 +109,7 @@ export class IncidentsService {
   async update(member: CurrentMember, ref: string, input: IncidentInput) {
     const { organizationId } = member;
     this.assertNotInFuture(input.occurredOn);
-    const ownerName = await this.memberName(organizationId, input.ownerId);
+    const ownerName = await ownerNameOf(this.db, organizationId, input.ownerId);
     const row = await this.findOpen(organizationId, ref);
     const before = this.snapshot(
       { ...row.incident, riskRef: row.risk ? formatRiskRef(row.risk.number) : null },
@@ -152,7 +141,7 @@ export class IncidentsService {
 
   async close(member: CurrentMember, ref: string, reason: string) {
     const row = await this.findOpen(member.organizationId, ref);
-    await assertNoOpenTasks(this.db, eq(tasks.incidentId, row.incident.id));
+    await assertNoOpenTasks(this.db, member, eq(tasks.incidentId, row.incident.id));
     await this.db.transaction(async (tx) => {
       await tx
         .update(incidents)
@@ -170,14 +159,16 @@ export class IncidentsService {
   async reopen(member: CurrentMember, ref: string, reason: string) {
     const row = await this.find(member.organizationId, ref);
     if (!row.incident.closedAt) throw new ConflictException('This Incident is not closed.');
+    const owner = await ownerOnReturn(this.db, member, row.incident, row.ownerName);
     await this.db.transaction(async (tx) => {
       await tx
         .update(incidents)
-        .set({ closedAt: null, closedById: null, closedReason: null })
+        .set({ closedAt: null, closedById: null, closedReason: null, ownerId: owner.id })
         .where(this.scoped(member.organizationId, row.incident.id));
       await recordEvent(tx, member, {
         action: 'incident.reopened',
         ...this.record(row.incident),
+        ...owner.change,
         reason,
       });
     });
@@ -186,12 +177,8 @@ export class IncidentsService {
 
   /** For a report made by mistake. The record and its trail stay; it leaves the register. */
   async delete(member: CurrentMember, ref: string, reason: string) {
-    const row = await this.find(member.organizationId, ref);
-    const [{ taskCount }] = await this.db
-      .select({ taskCount: count() })
-      .from(tasks)
-      .where(eq(tasks.incidentId, row.incident.id));
-    if (taskCount > 0) {
+    const row = await this.findOpen(member.organizationId, ref);
+    if ((await this.taskCount(member.organizationId, row.incident.id)) > 0) {
       throw new ConflictException('This Incident has Tasks on record, so it stays. Close it.');
     }
     await this.db.transaction(async (tx) => {
@@ -223,6 +210,14 @@ export class IncidentsService {
     if (occurredOn > today()) {
       throw new BadRequestException('An Incident is something that has already happened.');
     }
+  }
+
+  private async taskCount(organizationId: string, id: string) {
+    const [{ total }] = await this.db
+      .select({ total: count() })
+      .from(tasks)
+      .where(and(eq(tasks.organizationId, organizationId), eq(tasks.incidentId, id)));
+    return total;
   }
 
   private scoped(organizationId: string, incidentId: string) {
@@ -298,15 +293,5 @@ export class IncidentsService {
       closedReason: incident.closedReason,
       state: incident.closedAt ? 'Closed' : 'Investigating',
     };
-  }
-
-  private async memberName(organizationId: string, memberId: string) {
-    const [member] = await this.db
-      .select({ name: users.name })
-      .from(members)
-      .innerJoin(users, eq(users.id, members.userId))
-      .where(and(eq(members.organizationId, organizationId), eq(members.id, memberId)));
-    if (!member) throw new BadRequestException('Choose an owner from your Members.');
-    return member.name;
   }
 }

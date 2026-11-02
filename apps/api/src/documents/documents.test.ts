@@ -4,6 +4,7 @@ import { AuditTrailService } from '../audit/audit-trail';
 import { createDb } from '../db/client';
 import { members, organizations, users } from '../db/schema';
 import type { CurrentMember } from '../members/current-member';
+import { MembersService } from '../members/members.service';
 import { testDatabaseUrl } from '../test/database';
 import { testFiles } from '../test/files';
 import { DocumentsService, type DocumentInput } from './documents.service';
@@ -12,6 +13,8 @@ const { db, client } = createDb(testDatabaseUrl());
 const { files } = testFiles(db);
 const trail = new AuditTrailService(db);
 const documents = new DocumentsService(db, trail, files);
+
+const membersService = new MembersService(db);
 
 afterAll(() => client.end());
 
@@ -194,6 +197,22 @@ describe('withdrawing a Document', () => {
     await documents.reinstate(org.owner, id, 'Needed again');
     expect((await documents.get(org.id, id)).state).toBe('Confirmed');
   });
+
+  it('goes to whoever reinstates it if its owner has left', async () => {
+    const org = await organization();
+    const { id } = await documents.create(org.owner, input(org.colleague.id));
+    await documents.withdraw(org.owner, id, 'Merged');
+    await membersService.remove(org.owner, org.colleague.id, 'Left');
+    await documents.reinstate(org.owner, id, 'Needed again');
+
+    const record = await documents.get(org.id, id);
+    expect(record).toMatchObject({ ownerId: org.owner.id, ownerName: 'Owner' });
+    expect(record.history[0]).toMatchObject({
+      action: 'document.reinstated',
+      before: { ownerName: 'Colleague' },
+      after: { ownerName: 'Owner' },
+    });
+  });
 });
 
 describe('deleting a Document', () => {
@@ -220,6 +239,13 @@ describe('deleting a Document', () => {
     const { id } = await documents.create(org.owner, input(org.owner.id));
     await documents.confirm(org.owner, id);
     await expect(documents.delete(org.owner, id, 'Mistake')).rejects.toThrow('stays');
+  });
+
+  it('is refused once it is withdrawn', async () => {
+    const org = await organization();
+    const { id } = await documents.create(org.owner, input(org.owner.id));
+    await documents.withdraw(org.owner, id, 'Merged');
+    await expect(documents.delete(org.owner, id, 'Mistake')).rejects.toThrow('Reinstate');
   });
 });
 

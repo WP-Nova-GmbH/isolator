@@ -1,26 +1,26 @@
 import {
-  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, count, desc, eq, isNull, max, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, isNull, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { AuditTrailService, recordEvent } from '../audit/audit-trail';
 import { DB, type Database } from '../db/db.module';
+import { nextNumber } from '../db/next-number';
 import {
   auditEvents,
   controls,
   evidence,
   members,
-  organizations,
   riskControls,
   risks,
   soaEntries,
   users,
 } from '../db/schema';
 import type { CurrentMember } from '../members/current-member';
+import { ownerNameOf } from '../members/owner-name';
 import { decisionOf, formatRiskRef } from '../risks/risk-decision';
 import { fileState } from '../suppliers/supplier-rules';
 import { today } from '../validation';
@@ -132,17 +132,7 @@ export class SoaService {
   async addOwnControl(member: CurrentMember, title: string) {
     const { organizationId } = member;
     const ownNumber = await this.db.transaction(async (tx) => {
-      // Holds the Organization's row so two own controls can't take the same number.
-      await tx
-        .select({ id: organizations.id })
-        .from(organizations)
-        .where(eq(organizations.id, organizationId))
-        .for('update');
-      const [{ highest }] = await tx
-        .select({ highest: max(soaEntries.ownNumber) })
-        .from(soaEntries)
-        .where(eq(soaEntries.organizationId, organizationId));
-      const next = (highest ?? 0) + 1;
+      const next = await nextNumber(tx, organizationId, soaEntries);
       const [entry] = await tx
         .insert(soaEntries)
         .values({ organizationId, ownNumber: next, ownTitle: title })
@@ -159,7 +149,7 @@ export class SoaService {
   async update(member: CurrentMember, ref: string, input: SoaEntryInput) {
     const { organizationId } = member;
     const row = await this.entry(organizationId, ref);
-    const ownerName = input.ownerId ? await this.memberName(organizationId, input.ownerId) : null;
+    const ownerName = input.ownerId ? await ownerNameOf(this.db, organizationId, input.ownerId) : null;
     const before = { ...decisionOfEntry(row.entry), ownerName: row.ownerName };
     const after = { ...decisionOfEntry(input), ownerName };
     if (JSON.stringify(before) === JSON.stringify(after)) return { ref };
@@ -294,15 +284,5 @@ export class SoaService {
       everConfirmed: last !== undefined,
       confirmation: confirmed ? { by: last.memberName, at: last.at } : null,
     };
-  }
-
-  private async memberName(organizationId: string, memberId: string) {
-    const [member] = await this.db
-      .select({ name: users.name })
-      .from(members)
-      .innerJoin(users, eq(users.id, members.userId))
-      .where(and(eq(members.organizationId, organizationId), eq(members.id, memberId)));
-    if (!member) throw new BadRequestException('Choose an owner from your Members.');
-    return member.name;
   }
 }

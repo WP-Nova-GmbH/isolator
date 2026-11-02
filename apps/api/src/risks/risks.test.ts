@@ -5,6 +5,7 @@ import { AuditTrailService } from '../audit/audit-trail';
 import { createDb } from '../db/client';
 import { assets, auditEvents, controls, members, organizations, users } from '../db/schema';
 import type { CurrentMember } from '../members/current-member';
+import { MembersService } from '../members/members.service';
 import { NonconformitiesService } from '../nonconformities/nonconformities.service';
 import { SoaService } from '../soa/soa.service';
 import { SuppliersService } from '../suppliers/suppliers.service';
@@ -29,6 +30,8 @@ const tasks = new TasksService(
   new NonconformitiesService(db, trail),
   new SoaService(db, trail),
 );
+
+const membersService = new MembersService(db);
 
 afterAll(() => client.end());
 
@@ -187,7 +190,7 @@ describe('tenancy', () => {
   it('refuses owners and assets from another Organization', async () => {
     const a = await organization();
     const b = await organization();
-    await expect(risks.create(a.owner, input(b.owner.id))).rejects.toThrow('Choose a risk owner');
+    await expect(risks.create(a.owner, input(b.owner.id))).rejects.toThrow('Choose an owner');
 
     const { ref } = await risks.create(a.owner, input(a.owner.id));
     await expect(risks.linkAsset(a.owner, ref, b.asset.id)).rejects.toThrow('Choose an asset');
@@ -207,7 +210,7 @@ describe('tenancy', () => {
     const assessment = await assessments.start(a.owner);
 
     expect(await tasks.list(b.id)).toEqual([]);
-    await expect(tasks.setDone(b.owner, task.id, true)).rejects.toThrow('does not exist');
+    await expect(tasks.finish(b.owner, task.id)).rejects.toThrow('does not exist');
     await expect(
       tasks.create(b.owner, { title: 'x', ownerId: b.owner.id, dueOn: '2099-01-01', riskRef: ref }),
     ).rejects.toThrow('does not exist');
@@ -262,7 +265,7 @@ describe('closing a risk', () => {
       riskRef: ref,
     });
     await expect(risks.close(org.owner, ref, 'Gone')).rejects.toThrow('open Task');
-    await tasks.setDone(org.owner, task.id, true);
+    await tasks.finish(org.owner, task.id);
     await expect(risks.close(org.owner, ref, 'Gone')).resolves.toEqual({ ref });
   });
 
@@ -303,6 +306,22 @@ describe('reopening a risk', () => {
     const { confirmation, history } = await risks.get(org.id, ref);
     expect(confirmation).not.toBeNull();
     expect(history[0].before).toMatchObject({ treatment: 'mitigate' });
+  });
+
+  it('goes to whoever reopens it if its risk owner has left', async () => {
+    const org = await organization();
+    const { ref } = await risks.create(org.owner, input(org.colleague.id));
+    await risks.close(org.colleague, ref, 'Gone');
+    await membersService.remove(org.owner, org.colleague.id, 'Left');
+    await risks.reopen(org.owner, ref, 'Back');
+
+    const record = await risks.get(org.id, ref);
+    expect(record).toMatchObject({ ownerId: org.owner.id, ownerName: 'Owner' });
+    expect(record.history[0]).toMatchObject({
+      action: 'risk.reopened',
+      before: { ownerName: 'Colleague' },
+      after: { ownerName: 'Owner' },
+    });
   });
 });
 
@@ -353,6 +372,13 @@ describe('deleting a risk', () => {
     });
     await expect(risks.delete(org.owner, ref, 'Mistake')).rejects.toThrow('open Task');
   });
+
+  it('is refused once it is closed', async () => {
+    const org = await organization();
+    const { ref } = await risks.create(org.owner, input(org.owner.id));
+    await risks.close(org.owner, ref, 'Gone');
+    await expect(risks.delete(org.owner, ref, 'Mistake')).rejects.toThrow('Reopen');
+  });
 });
 
 describe('Audit trail', () => {
@@ -374,7 +400,7 @@ describe('Audit trail', () => {
       dueOn: '2099-01-01',
       riskRef: ref,
     });
-    await tasks.setDone(org.owner, task.id, true);
+    await tasks.finish(org.owner, task.id);
 
     const { events, total } = await trail.list(org.id);
     expect(total).toBe(9);
@@ -459,7 +485,7 @@ describe('deleting', () => {
       dueOn: '2099-01-01',
       riskRef: ref,
     });
-    await tasks.setDone(org.owner, task.id, true);
+    await tasks.finish(org.owner, task.id);
 
     await db.delete(organizations).where(eq(organizations.id, org.id));
     expect(await risks.list(org.id)).toEqual([]);
@@ -554,8 +580,21 @@ describe('Tasks', () => {
       (await tasks.list(org.id, { riskRef: ref })).map((task) => task.state);
     expect(await states()).toEqual(['Overdue', 'Open']);
 
-    await tasks.setDone(org.owner, overdue.id, true);
+    await tasks.finish(org.owner, overdue.id);
     expect(await states()).toEqual(['Done', 'Open']);
+  });
+
+  it('can only be finished once', async () => {
+    const org = await organization();
+    const { ref } = await risks.create(org.owner, input(org.owner.id));
+    const { id } = await tasks.create(org.owner, {
+      title: 'Encrypt',
+      ownerId: org.owner.id,
+      dueOn: '2099-01-01',
+      riskRef: ref,
+    });
+    await tasks.finish(org.owner, id);
+    await expect(tasks.finish(org.owner, id)).rejects.toThrow('already finished');
   });
 
   it('show which risk they belong to', async () => {

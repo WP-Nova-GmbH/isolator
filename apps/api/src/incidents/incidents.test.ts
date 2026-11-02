@@ -4,6 +4,7 @@ import { AuditTrailService } from '../audit/audit-trail';
 import { createDb } from '../db/client';
 import { members, organizations, users } from '../db/schema';
 import type { CurrentMember } from '../members/current-member';
+import { MembersService } from '../members/members.service';
 import { NonconformitiesService } from '../nonconformities/nonconformities.service';
 import { RiskCriteriaService } from '../risks/risk-criteria.service';
 import { RisksService } from '../risks/risks.service';
@@ -26,6 +27,8 @@ const tasks = new TasksService(
   new NonconformitiesService(db, trail),
   new SoaService(db, trail),
 );
+
+const membersService = new MembersService(db);
 
 afterAll(() => client.end());
 
@@ -158,6 +161,22 @@ describe('closing an Incident', () => {
     await tasks.cancel(org.owner, id, 'No longer needed');
     await expect(incidents.close(org.owner, ref, 'Done')).resolves.toEqual({ ref });
   });
+
+  it('goes to whoever reopens it if its owner has left', async () => {
+    const org = await organization();
+    const { ref } = await incidents.report(org.owner, input(org.colleague.id));
+    await incidents.close(org.owner, ref, 'Done');
+    await membersService.remove(org.owner, org.colleague.id, 'Left');
+    await incidents.reopen(org.owner, ref, 'It came back');
+
+    const record = await incidents.get(org.id, ref);
+    expect(record).toMatchObject({ ownerId: org.owner.id, ownerName: 'Owner' });
+    expect(record.history[0]).toMatchObject({
+      action: 'incident.reopened',
+      before: { ownerName: 'Colleague' },
+      after: { ownerName: 'Owner' },
+    });
+  });
 });
 
 describe('deleting an Incident', () => {
@@ -178,9 +197,16 @@ describe('deleting an Incident', () => {
     const org = await organization();
     const { ref } = await incidents.report(org.owner, input(org.owner.id));
     const { id } = await tasks.create(org.owner, task(org.owner.id, ref));
-    await tasks.setDone(org.owner, id, true);
+    await tasks.finish(org.owner, id);
     await expect(incidents.delete(org.owner, ref, 'Mistake')).rejects.toThrow('stays');
     expect((await incidents.get(org.id, ref)).deletable).toBe(false);
+  });
+
+  it('is refused once it is closed', async () => {
+    const org = await organization();
+    const { ref } = await incidents.report(org.owner, input(org.owner.id));
+    await incidents.close(org.owner, ref, 'Done');
+    await expect(incidents.delete(org.owner, ref, 'Mistake')).rejects.toThrow('Reopen');
   });
 });
 
@@ -227,13 +253,13 @@ describe('cancelling a Task', () => {
     const org = await organization();
     const { ref } = await incidents.report(org.owner, input(org.owner.id));
     const done = await tasks.create(org.owner, task(org.owner.id, ref));
-    await tasks.setDone(org.owner, done.id, true);
+    await tasks.finish(org.owner, done.id);
     await expect(tasks.cancel(org.owner, done.id, 'x')).rejects.toThrow('already finished');
 
     const cancelled = await tasks.create(org.owner, task(org.owner.id, ref));
     await tasks.cancel(org.owner, cancelled.id, 'x');
     await expect(tasks.cancel(org.owner, cancelled.id, 'x')).rejects.toThrow('already finished');
-    await expect(tasks.setDone(org.owner, cancelled.id, true)).rejects.toThrow('already finished');
+    await expect(tasks.finish(org.owner, cancelled.id)).rejects.toThrow('already finished');
   });
 
   it('stays within the Organization', async () => {

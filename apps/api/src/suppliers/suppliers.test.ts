@@ -5,6 +5,7 @@ import { AuditTrailService } from '../audit/audit-trail';
 import { createDb } from '../db/client';
 import { assets, members, organizations, users } from '../db/schema';
 import type { CurrentMember } from '../members/current-member';
+import { MembersService } from '../members/members.service';
 import { NonconformitiesService } from '../nonconformities/nonconformities.service';
 import { RiskCriteriaService } from '../risks/risk-criteria.service';
 import { RisksService } from '../risks/risks.service';
@@ -28,6 +29,8 @@ const tasks = new TasksService(
   new NonconformitiesService(db, trail),
   new SoaService(db, trail),
 );
+
+const membersService = new MembersService(db);
 
 afterAll(() => client.end());
 
@@ -290,7 +293,7 @@ describe('ending a Supplier', () => {
     await expect(suppliers.end(org.owner, ref, 'Moved')).rejects.toThrow('still provides');
     await suppliers.unlinkAsset(org.owner, ref, org.asset.id);
     await expect(suppliers.end(org.owner, ref, 'Moved')).rejects.toThrow('open Task');
-    await tasks.setDone(org.owner, task.id, true);
+    await tasks.finish(org.owner, task.id);
     await expect(suppliers.end(org.owner, ref, 'Moved')).resolves.toEqual({ ref });
   });
 
@@ -326,6 +329,22 @@ describe('ending a Supplier', () => {
     expect(supplier).toMatchObject({ endedAt: null, endedReason: null });
     expect(supplier.history[0]).toMatchObject({ action: 'supplier.resumed', reason: 'Moved back' });
   });
+
+  it('goes to whoever resumes it if its owner has left', async () => {
+    const org = await organization();
+    const { ref } = await suppliers.create(org.owner, input(org.colleague.id));
+    await suppliers.end(org.owner, ref, 'Moved');
+    await membersService.remove(org.owner, org.colleague.id, 'Left');
+    await suppliers.resume(org.owner, ref, 'Moved back');
+
+    const record = await suppliers.get(org.id, ref);
+    expect(record).toMatchObject({ ownerId: org.owner.id, ownerName: 'Owner' });
+    expect(record.history[0]).toMatchObject({
+      action: 'supplier.resumed',
+      before: { ownerName: 'Colleague' },
+      after: { ownerName: 'Owner' },
+    });
+  });
 });
 
 describe('deleting a Supplier', () => {
@@ -355,6 +374,13 @@ describe('deleting a Supplier', () => {
     const filed = await suppliers.create(org.owner, input(org.owner.id));
     await suppliers.addFile(org.owner, filed.ref, file);
     await expect(suppliers.delete(org.owner, filed.ref, 'x')).rejects.toThrow('stays');
+  });
+
+  it('is refused once it has ended', async () => {
+    const org = await organization();
+    const { ref } = await suppliers.create(org.owner, input(org.owner.id));
+    await suppliers.end(org.owner, ref, 'Moved');
+    await expect(suppliers.delete(org.owner, ref, 'Mistake')).rejects.toThrow('Resume');
   });
 });
 

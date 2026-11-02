@@ -33,7 +33,7 @@ export function addTask(
 }
 
 export function finishTask(form: FormData) {
-  return api(`/tasks/${form.get('id')}/state`, { method: 'PUT', body: { done: true } });
+  return api(`/tasks/${form.get('id')}/completion`, { method: 'POST' });
 }
 
 export function cancelTask(form: FormData) {

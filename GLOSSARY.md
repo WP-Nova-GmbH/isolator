@@ -6,7 +6,7 @@
 
 **Scope** – the boundaries of the ISMS (clause 4.3): which companies, locations, units, systems are covered.
 
-**Member** – a person invited into an Organization. Every Member can see and do everything in its ISMS, except that a risk's Confirmation comes from its risk owner. A removed Member can no longer reach the Organization but stays on record, and comes back the same Member if invited again.
+**Member** – a person invited into an Organization. Every Member can see and do everything in its ISMS, except that a risk's Confirmation comes from its risk owner. A removed Member can no longer reach the Organization but stays on record, and comes back the same Member if invited again. Closed records keep their name as owner, and whoever brings one back takes it over.
 
 **Invitation** – a link, good for one use and for 7 days, that lets one email address join an Organization as a Member. Any Member can create one, and the Operator can for any Organization.
 

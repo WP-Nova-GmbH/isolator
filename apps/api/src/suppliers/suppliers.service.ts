@@ -5,14 +5,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, asc, count, desc, eq, isNotNull, isNull, max, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, isNotNull, isNull, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { AuditTrailService, recordEvent } from '../audit/audit-trail';
 import { DB, type Database } from '../db/db.module';
+import { nextNumber } from '../db/next-number';
 import {
   assets,
   members,
-  organizations,
   riskAssets,
   risks,
   storedFiles,
@@ -24,6 +24,7 @@ import {
 } from '../db/schema';
 import { FilesService } from '../files/files.service';
 import type { CurrentMember } from '../members/current-member';
+import { ownerNameOf, ownerOnReturn } from '../members/owner-name';
 import { formatRiskRef } from '../risks/risk-decision';
 import { assertNoOpenTasks } from '../tasks/open-tasks';
 import { today } from '../validation';
@@ -207,19 +208,9 @@ export class SuppliersService {
   }
 
   async create(member: CurrentMember, input: SupplierInput) {
-    const ownerName = await this.memberName(member.organizationId, input.ownerId);
+    const ownerName = await ownerNameOf(this.db, member.organizationId, input.ownerId);
     const number = await this.db.transaction(async (tx) => {
-      // Holds the Organization's row so two new Suppliers can't take the same number.
-      await tx
-        .select({ id: organizations.id })
-        .from(organizations)
-        .where(eq(organizations.id, member.organizationId))
-        .for('update');
-      const [{ highest }] = await tx
-        .select({ highest: max(suppliers.number) })
-        .from(suppliers)
-        .where(eq(suppliers.organizationId, member.organizationId));
-      const next = (highest ?? 0) + 1;
+      const next = await nextNumber(tx, member.organizationId, suppliers);
       const [supplier] = await tx
         .insert(suppliers)
         .values({ ...input, organizationId: member.organizationId, number: next })
@@ -235,7 +226,7 @@ export class SuppliersService {
   }
 
   async update(member: CurrentMember, ref: string, input: SupplierInput) {
-    const ownerName = await this.memberName(member.organizationId, input.ownerId);
+    const ownerName = await ownerNameOf(this.db, member.organizationId, input.ownerId);
     const row = await this.findActive(member.organizationId, ref);
     const before = this.snapshot(row.supplier, row.ownerName);
     const after = this.snapshot(input, ownerName);
@@ -258,7 +249,7 @@ export class SuppliersService {
   async end(member: CurrentMember, ref: string, reason: string) {
     const row = await this.findActive(member.organizationId, ref);
     await this.assertNoAssets(row.supplier.id);
-    await assertNoOpenTasks(this.db, eq(tasks.supplierId, row.supplier.id));
+    await assertNoOpenTasks(this.db, member, eq(tasks.supplierId, row.supplier.id));
     await this.db.transaction(async (tx) => {
       await tx
         .update(suppliers)
@@ -276,14 +267,16 @@ export class SuppliersService {
   async resume(member: CurrentMember, ref: string, reason: string) {
     const row = await this.find(member.organizationId, ref);
     if (!row.supplier.endedAt) throw new ConflictException('This Supplier has not ended.');
+    const owner = await ownerOnReturn(this.db, member, row.supplier, row.ownerName);
     await this.db.transaction(async (tx) => {
       await tx
         .update(suppliers)
-        .set({ endedAt: null, endedReason: null })
+        .set({ endedAt: null, endedReason: null, ownerId: owner.id })
         .where(this.scoped(member.organizationId, row.supplier.id));
       await recordEvent(tx, member, {
         action: 'supplier.resumed',
         ...this.record(row.supplier),
+        ...owner.change,
         reason,
       });
     });
@@ -292,7 +285,7 @@ export class SuppliersService {
 
   /** For an entry made by mistake. The record and its trail stay; it leaves the register. */
   async delete(member: CurrentMember, ref: string, reason: string) {
-    const row = await this.find(member.organizationId, ref);
+    const row = await this.findActive(member.organizationId, ref);
     const [[{ reviews }], [{ files }]] = await Promise.all([
       this.db
         .select({ reviews: count() })
@@ -309,7 +302,7 @@ export class SuppliersService {
       );
     }
     await this.assertNoAssets(row.supplier.id);
-    await assertNoOpenTasks(this.db, eq(tasks.supplierId, row.supplier.id));
+    await assertNoOpenTasks(this.db, member, eq(tasks.supplierId, row.supplier.id));
     await this.db.transaction(async (tx) => {
       await tx
         .update(suppliers)
@@ -583,15 +576,5 @@ export class SuppliersService {
           : `This Supplier still provides ${linked} assets. Remove them first.`,
       );
     }
-  }
-
-  private async memberName(organizationId: string, memberId: string) {
-    const [member] = await this.db
-      .select({ name: users.name })
-      .from(members)
-      .innerJoin(users, eq(users.id, members.userId))
-      .where(and(eq(members.organizationId, organizationId), eq(members.id, memberId)));
-    if (!member) throw new BadRequestException('Choose an owner from your Members.');
-    return member.name;
   }
 }

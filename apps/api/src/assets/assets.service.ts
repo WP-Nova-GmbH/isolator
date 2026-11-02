@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -11,6 +10,7 @@ import { AuditTrailService, recordEvent } from '../audit/audit-trail';
 import { DB, type Database } from '../db/db.module';
 import { assets, members, riskAssets, risks, suppliers, users } from '../db/schema';
 import type { CurrentMember } from '../members/current-member';
+import { ownerNameOf, ownerOnReturn } from '../members/owner-name';
 import { formatRiskRef } from '../risks/risk-decision';
 import { formatSupplierRef } from '../suppliers/supplier-rules';
 import { SuppliersService } from '../suppliers/suppliers.service';
@@ -99,7 +99,7 @@ export class AssetsService {
 
   async create(member: CurrentMember, input: AssetInput) {
     const { organizationId } = member;
-    const ownerName = await this.memberName(organizationId, input.ownerId);
+    const ownerName = await ownerNameOf(this.db, organizationId, input.ownerId);
     const supplierId = await this.supplierId(organizationId, input.supplierRef);
     return this.db.transaction(async (tx) => {
       const [asset] = await tx
@@ -126,7 +126,7 @@ export class AssetsService {
 
   async update(member: CurrentMember, id: string, input: AssetInput) {
     const { organizationId } = member;
-    const ownerName = await this.memberName(organizationId, input.ownerId);
+    const ownerName = await ownerNameOf(this.db, organizationId, input.ownerId);
     const row = await this.find(organizationId, id);
     if (row.asset.retiredAt) throw new ConflictException('Reinstate this asset to change it.');
     const currentRef =
@@ -199,16 +199,18 @@ export class AssetsService {
     const { organizationId } = member;
     const row = await this.find(organizationId, id);
     if (!row.asset.retiredAt) throw new ConflictException('This asset is not retired.');
+    const owner = await ownerOnReturn(this.db, member, row.asset, row.ownerName);
     await this.db.transaction(async (tx) => {
       await tx
         .update(assets)
-        .set({ retiredAt: null, retiredReason: null })
+        .set({ retiredAt: null, retiredReason: null, ownerId: owner.id })
         .where(and(eq(assets.organizationId, organizationId), eq(assets.id, id)));
       await recordEvent(tx, member, {
         action: 'asset.reinstated',
         recordType: 'asset',
         recordId: id,
         recordLabel: row.asset.name,
+        ...owner.change,
         reason,
       });
     });
@@ -219,6 +221,7 @@ export class AssetsService {
   async delete(member: CurrentMember, id: string, reason: string) {
     const { organizationId } = member;
     const row = await this.find(organizationId, id);
+    if (row.asset.retiredAt) throw new ConflictException('Reinstate this asset to change it.');
     const [{ linked }] = await this.db
       .select({ linked: count() })
       .from(riskAssets)
@@ -288,15 +291,5 @@ export class AssetsService {
 
   private supplierId(organizationId: string, ref: string | null) {
     return ref ? this.suppliers.activeIdOf(organizationId, ref) : null;
-  }
-
-  private async memberName(organizationId: string, memberId: string) {
-    const [member] = await this.db
-      .select({ name: users.name })
-      .from(members)
-      .innerJoin(users, eq(users.id, members.userId))
-      .where(and(eq(members.organizationId, organizationId), eq(members.id, memberId)));
-    if (!member) throw new BadRequestException('Choose an owner from your Members.');
-    return member.name;
   }
 }
