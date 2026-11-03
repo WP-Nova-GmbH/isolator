@@ -1,3 +1,4 @@
+import { UserButton } from '@clerk/react';
 import {
   Form,
   redirect,
@@ -150,15 +151,13 @@ export function Organizations() {
     <div className="min-h-svh bg-background px-2 pb-2">
       <header className="mx-auto flex max-w-260 items-center justify-between gap-3 px-1 py-3.5">
         <Logo className="h-5.5 w-auto" />
-        <Form method="post" action="/sign-out" className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <span className="text-muted-foreground">
             {me.name}
             {me.isOperator && ', Operator'}
           </span>
-          <Button type="submit" variant="ghost" size="xs">
-            Sign out
-          </Button>
-        </Form>
+          <UserButton />
+        </div>
       </header>
       <main className="mx-auto flex max-w-260 flex-col gap-6 rounded-lg border bg-surface px-4 py-5 shadow-sheet md:px-9 md:pt-7 md:pb-9">
         <PageHeader

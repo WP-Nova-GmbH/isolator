@@ -1,3 +1,4 @@
+import { UserButton } from '@clerk/react';
 import {
   ArchiveIcon,
   BoxIcon,
@@ -14,9 +15,8 @@ import {
   TriangleAlertIcon,
   UsersIcon,
 } from 'lucide-react';
-import { Form, Link, NavLink, Outlet, useLocation } from 'react-router';
+import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { Logo, Mark } from '@/components/logo';
-import { Button } from '@/components/ui/button';
 import { NativeSelect } from '@/components/ui/native-select';
 import {
   Sidebar,
@@ -67,13 +67,6 @@ const navGroups = [
     items: [{ to: '/members', label: 'Members and settings', icon: UsersIcon }],
   },
 ];
-
-function initials(name: string) {
-  return name
-    .split(' ')
-    .map((part) => part[0])
-    .join('');
-}
 
 function AppSidebar() {
   const { pathname } = useLocation();
@@ -126,15 +119,8 @@ function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="gap-2 px-2.5 pb-3">
         <div className="flex items-center gap-2 border-t pt-3 font-medium text-foreground">
-          <span className="grid size-6 shrink-0 place-items-center rounded-full bg-selected text-[0.6875rem] leading-none font-semibold text-selected-foreground">
-            {initials(me.name)}
-          </span>
+          <UserButton />
           <span className="min-w-0 flex-1 truncate">{me.name}</span>
-          <Form method="post" action="/sign-out">
-            <Button type="submit" variant="ghost" size="xs">
-              Sign out
-            </Button>
-          </Form>
         </div>
         <label className="sr-only" htmlFor="language">
           Language

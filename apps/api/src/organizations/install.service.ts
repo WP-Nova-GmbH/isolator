@@ -9,15 +9,12 @@ import {
 import { eq } from 'drizzle-orm';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
-import { createUser, passwordInput } from '../auth/auth';
 import { DB, type Database } from '../db/db.module';
 import { users } from '../db/schema';
+import type { CurrentUser } from '../members/current-member';
 
 export const claimInput = z.object({
   token: z.string().trim().min(1, 'Enter the setup token.'),
-  name: z.string().trim().min(1, 'Give your name.'),
-  email: z.email('That isn’t an email address.').toLowerCase(),
-  password: passwordInput,
 });
 
 function digest(value: string) {
@@ -45,11 +42,11 @@ export class InstallService implements OnApplicationBootstrap {
     return operator !== undefined;
   }
 
-  async claim({ token, ...input }: z.infer<typeof claimInput>) {
+  async claim(user: CurrentUser, { token }: z.infer<typeof claimInput>) {
     if (await this.claimed()) throw new ConflictException('This install is already claimed.');
     if (!timingSafeEqual(digest(token), digest(this.setupToken))) {
       throw new ForbiddenException('That isn’t the setup token from this install’s logs.');
     }
-    await this.db.transaction((tx) => createUser(tx, { ...input, isOperator: true }));
+    await this.db.update(users).set({ isOperator: true }).where(eq(users.id, user.id));
   }
 }

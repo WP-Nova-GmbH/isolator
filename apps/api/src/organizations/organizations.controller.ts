@@ -19,7 +19,7 @@ import {
 } from '../members/current-member';
 import { parseBody } from '../validation';
 import { claimInput, InstallService } from './install.service';
-import { invitationInput, InvitationsService, newAccountInput } from './invitations.service';
+import { invitationInput, InvitationsService } from './invitations.service';
 import { newOrganizationInput, OrganizationsService } from './organizations.service';
 
 @Controller()
@@ -32,13 +32,18 @@ export class OrganizationsController {
 
   @Get('install')
   async status() {
-    return { claimed: await this.install.claimed() };
+    return {
+      claimed: await this.install.claimed(),
+      // From here rather than the web build, because one image serves every install.
+      clerkPublishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+    };
   }
 
   @Post('install/claim')
+  @UseGuards(UserGuard)
   @HttpCode(204)
-  claim(@Body() body: unknown) {
-    return this.install.claim(parseBody(claimInput, body));
+  claim(@User() user: CurrentUser, @Body() body: unknown) {
+    return this.install.claim(user, parseBody(claimInput, body));
   }
 
   @Get('organizations')
@@ -95,12 +100,6 @@ export class OrganizationsController {
   @Get('invites/:token')
   findInvite(@Param('token') token: string) {
     return this.invitations.find(token);
-  }
-
-  @Post('invites/:token/account')
-  @HttpCode(204)
-  acceptWithNewAccount(@Param('token') token: string, @Body() body: unknown) {
-    return this.invitations.acceptWithNewAccount(token, parseBody(newAccountInput, body));
   }
 
   @Post('invites/:token/acceptance')

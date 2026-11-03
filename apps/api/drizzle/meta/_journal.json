@@ -134,6 +134,20 @@
       "when": 1793580017091,
       "tag": "0018_defer_nonconformity_references",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793639487082,
+      "tag": "0019_drop_better_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793639508692,
+      "tag": "0020_clerk_sign_in",
+      "breakpoints": true
     }
   ]
 }

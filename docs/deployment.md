@@ -1,10 +1,11 @@
 # Deploying Isolator
 
-This guide runs Isolator on one Linux server. One container holds the API and the web app, Caddy in front of it handles HTTPS, and Postgres runs elsewhere. Uploaded files stay on a Docker volume unless you configure S3.
+This guide runs Isolator on one Linux server. One container holds the API and the web app, Caddy in front of it handles HTTPS, and Postgres runs elsewhere. Uploaded files stay on a Docker volume unless you configure S3. Sign-in runs on Clerk, the one outside service Isolator needs.
 
 ```
 browser ── HTTPS ──> Caddy ──> isolator container ──> your Postgres
-                                       │
+   │                                   │
+   └────────> Clerk <──────────────────┤
                                        └── /data/storage volume, or S3
 ```
 
@@ -13,6 +14,7 @@ browser ── HTTPS ──> Caddy ──> isolator container ──> your Postg
 - A Linux server with Docker and Docker Compose. 1 vCPU and 2 GB of RAM are plenty, because Isolator uses about 200 MB. Virus scanning needs more, see [below](#virus-scanning).
 - Postgres 17 that the server can reach.
 - A domain pointing at the server, with ports 80 and 443 open.
+- A [Clerk](https://clerk.com) application with a production instance on a domain whose DNS you control. The server must reach `api.clerk.com`, and nobody can sign in while Clerk is down.
 - Access to the image. WP Nova publishes it to `wp-containerz.cr.de-fra.ionos.com/isolator`, which needs a token with pull access. Without one, [build your own](#build-your-own-image).
 
 ## 1. Prepare Postgres
@@ -40,15 +42,19 @@ cd /opt/isolator
 
 ```sh
 DATABASE_URL=postgres://isolator:choose-a-password@db.example.com:5432/isolator?sslmode=verify-full
-BETTER_AUTH_URL=https://isolator.example.com
-BETTER_AUTH_SECRET=paste-the-output-of-openssl-rand-hex-32
+APP_URL=https://isolator.example.com
+CLERK_PUBLISHABLE_KEY=pk_live_...
+CLERK_SECRET_KEY=sk_live_...
 ```
 
 | Setting | Meaning |
 | --- | --- |
 | `DATABASE_URL` | Percent-encode any special characters in the password. |
-| `BETTER_AUTH_URL` | The exact address people open, with `https://` and no trailing slash. |
-| `BETTER_AUTH_SECRET` | Generate it with `openssl rand -hex 32` and keep it. Changing it signs everyone out. |
+| `APP_URL` | The exact address people open, with `https://` and no trailing slash. Isolator only accepts sign-ins made there. |
+| `CLERK_PUBLISHABLE_KEY` | From **API keys** in the Clerk Dashboard, for your production instance. |
+| `CLERK_SECRET_KEY` | From the same page. Anyone holding it can act for your whole Clerk instance. |
+
+In the Clerk Dashboard, ask for first and last name at sign-up. The Audit trail records people by name, and shows their email when they have none.
 
 For `sslmode`, use one of these:
 
@@ -56,7 +62,7 @@ For `sslmode`, use one of these:
 - `require` encrypts the connection but accepts any certificate.
 - Leave `sslmode` out only on a private network you trust, because the connection is then unencrypted.
 
-**`Caddyfile`** configures HTTPS. Caddy gets the certificate by itself.
+**`Caddyfile`** configures HTTPS. Caddy gets the certificate by itself. Replace `clerk.isolator.example.com` with your instance's Frontend API host, from **Domains** in the Clerk Dashboard. Clerk's sign-in loads from there, so the browser refuses it if this is wrong.
 
 ```caddyfile
 isolator.example.com {
@@ -67,7 +73,7 @@ isolator.example.com {
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
 		Referrer-Policy "same-origin"
-		Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+		Content-Security-Policy "default-src 'self'; script-src 'self' https://clerk.isolator.example.com https://challenges.cloudflare.com https://*.protect.clerk.com; connect-src 'self' https://clerk.isolator.example.com https://*.protect.clerk.com:*; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://img.clerk.com; frame-src https://challenges.cloudflare.com https://*.protect.clerk.com; worker-src 'self' blob:"
 	}
 }
 ```
@@ -108,7 +114,7 @@ volumes:
   clamav_db:
 ```
 
-Port 3000 stays inside Docker, so nothing reaches Isolator except through Caddy. Run one `isolator` container at a time: the setup token, the sign-in rate limit and local uploads aren't shared between containers.
+Port 3000 stays inside Docker, so nothing reaches Isolator except through Caddy. Run one `isolator` container at a time: the setup token and local uploads aren't shared between containers.
 
 ## 3. Start it and claim the install
 
@@ -122,18 +128,18 @@ Each start migrates the database and loads the control catalog before the API st
 Until someone claims the install, the logs show a setup token, which changes on every restart. Whoever enters it becomes the Operator, so do this straight away:
 
 1. Open your address. Isolator shows Claim.
-2. Enter the setup token, your name, your email and a password of at least 12 characters.
+2. Sign in, which creates your Clerk account the first time, then enter the setup token.
 3. Create the first Organization, then open the invitation link it shows you.
 
-Isolator sends no email, so you pass on invitation links yourself. Each link works once, for 7 days.
+Isolator doesn't send invitations, so you pass on the links yourself. Each link works once, for 7 days, and only for the address it was made for. A Clerk account alone opens no Organization.
 
 ## 4. Check it
 
 - `https://isolator.example.com` opens with a valid certificate.
 - `http://isolator.example.com` redirects to HTTPS.
 - `curl -I http://SERVER-IP:3000` from another machine fails to connect.
+- You can sign out and sign in again.
 - You can upload a file on a Supplier, and download it again.
-- `docker compose logs isolator` doesn't say `Rate limiting could not determine a client IP`.
 
 ## Upgrading
 
@@ -150,6 +156,16 @@ docker compose logs isolator
 ```
 
 The site is down for a few seconds. To go back, restore the backup and set the old version again. The old version can't run on a database that newer migrations changed.
+
+### Moving to Clerk
+
+The first version on Clerk deletes passwords and sessions from the database for good. Before upgrading:
+
+1. Set up your Clerk application, as under [What you need](#what-you-need).
+2. Add `APP_URL`, `CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` to `isolator.env`, and remove `BETTER_AUTH_URL` and `BETTER_AUTH_SECRET`.
+3. Change the `Content-Security-Policy` in your `Caddyfile` to the one above.
+
+After the upgrade everyone signs in again through Clerk, creating an account with the email they used before. Once Clerk has verified that address they're back in their Organizations, and the Operator stays the Operator. Someone who uses a different address starts as a new person with no Organization.
 
 ## Backups
 
@@ -190,7 +206,7 @@ docker compose run --rm -T --no-deps --entrypoint tar isolator xzf - -C /data/st
 docker compose up -d isolator
 ```
 
-Sessions survive a restore, so people stay signed in. Try a restore before you rely on it.
+Accounts live in Clerk, so a restore leaves them alone and people stay signed in. Someone who joined after the backup was taken is no longer a Member, and needs a new invitation. Try a restore before you rely on it.
 
 ## Running it
 
@@ -198,9 +214,8 @@ Sessions survive a restore, so people stay signed in. Try a restore before you r
 | --- | --- |
 | See logs | `docker compose logs -f isolator` |
 | Check it's up | `GET /api/health`, which also checks the database |
-| Reset a forgotten password | `docker compose exec isolator node dist/src/auth/reset-password.js someone@example.com` |
 
-A password reset prints the new password and signs that person out everywhere.
+People reset a forgotten password themselves on the sign-in page. To lock someone out at once, ban them in the Clerk Dashboard, and remove them as a Member of their Organization.
 
 ### S3 file storage
 
@@ -251,12 +266,9 @@ The host name in `DATABASE_URL` must match the database's certificate.
 
 Remove the `caddy` service, publish `127.0.0.1:3000:3000` on `isolator`, and point your proxy there. The proxy must:
 
-- Serve HTTPS at the address in `BETTER_AUTH_URL`, and pass the `Host` header on.
-- Set `X-Forwarded-For` to exactly one address, the client's, replacing whatever came in. On nginx, that's `proxy_set_header X-Forwarded-For $remote_addr;`. If the header is missing or holds a list, Isolator can't tell clients apart, and everyone shares one limit of 3 sign-ins every 10 seconds.
+- Serve HTTPS at the address in `APP_URL`.
 - Allow request bodies of at least 26 MB. Uploads go up to 25 MB, and nginx allows only 1 MB by default.
 - Add the security headers from the `Caddyfile` above. Isolator doesn't set them itself.
-
-A CDN in front of your proxy doesn't work well yet, because the proxy sees the CDN's address instead of the client's, so many people share one limit.
 
 ## Publishing a new version
 
@@ -286,15 +298,16 @@ Leave `DOCKER_REGISTRY` unset and the image is called `isolator:<version>`. `--a
 
 | What you see | What's wrong |
 | --- | --- |
-| Container keeps restarting, logs say `You are using the default secret` | `BETTER_AUTH_SECRET` is missing from `isolator.env`. |
+| Container keeps restarting, logs say `Set CLERK_SECRET_KEY and CLERK_PUBLISHABLE_KEY` or `Set APP_URL` | That setting is missing from `isolator.env`. |
 | Logs say `permission denied for database` | The role doesn't own the database. See [step 1](#1-prepare-postgres). |
 | Logs say `unable to verify the first certificate` | See [Private database certificates](#private-database-certificates). |
 | Logs say `ERR_TLS_CERT_ALTNAME_INVALID` | The host name in `DATABASE_URL` doesn't match the database's certificate. |
-| Signing in fails with `Invalid origin` | `BETTER_AUTH_URL` doesn't match the address in the browser exactly. |
-| Sign-in is rate limited for everyone at once, and the logs say `Rate limiting could not determine a client IP` | The proxy isn't setting a single `X-Forwarded-For` address. See [Using another proxy](#using-another-proxy). |
+| Signing in works, then every page says it didn't load | `APP_URL` doesn't match the address in the browser exactly. |
+| The sign-in page shows no form | The `Content-Security-Policy` doesn't allow your Clerk host, or something else blocks Clerk. The browser console says which. |
+| Someone signs in and has no Organization | They used a different address from the one they were invited with. |
 | Every upload fails with `The virus scanner isn't reachable` | `CLAMAV_HOST` is set, but ClamAV isn't running or is still starting. |
 | A file says `This file is stored in S3, but this install has no S3 settings` | `S3_BUCKET` was removed. Set it again. |
 | Lost the setup token | `docker compose logs isolator` shows it. Restarting prints a new one. |
 | Claim doesn't appear | The install is already claimed. The Operator signs in as usual. |
 
-See [ADR 0004](adr/0004-self-hostable-with-own-auth.md) for why it's built this way.
+See [ADR 0004](adr/0004-self-hostable-with-own-auth.md) and [ADR 0006](adr/0006-sign-in-with-clerk.md) for why it's built this way.

@@ -1,7 +1,7 @@
 # 4. Self-hostable, with auth in our own Postgres
 
 Date: 2026-11-01
-Status: accepted
+Status: accepted, with sign-in replaced by [ADR 0006](0006-sign-in-with-clerk.md)
 
 ## Context
 

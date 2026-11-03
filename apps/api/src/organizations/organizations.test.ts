@@ -2,9 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { AuditTrailService } from '../audit/audit-trail';
-import { createAuth, createUser } from '../auth/auth';
 import { createDb } from '../db/client';
-import { invitations, members, organizations, risks, tasks, users } from '../db/schema';
+import { invitations, members, organizations, risks, sessions, tasks, users } from '../db/schema';
 import type { CurrentMember, CurrentUser } from '../members/current-member';
 import { MembersService } from '../members/members.service';
 import { testDatabaseUrl } from '../test/database';
@@ -13,17 +12,20 @@ import { InvitationsService } from './invitations.service';
 import { OrganizationsService } from './organizations.service';
 
 const { db, client } = createDb(testDatabaseUrl());
-const auth = createAuth(db);
 const invitationService = new InvitationsService(db);
 const organizationService = new OrganizationsService(db, invitationService);
 const memberService = new MembersService(db);
 const trail = new AuditTrailService(db);
-const password = 'a-long-test-password';
 
 afterAll(() => client.end());
 
 function email() {
   return `${randomUUID()}@example.com`;
+}
+
+async function addUser(name: string) {
+  const [created] = await db.insert(users).values({ name, email: email() }).returning();
+  return created;
 }
 
 function user(overrides: Partial<CurrentUser> = {}): CurrentUser {
@@ -38,9 +40,14 @@ function user(overrides: Partial<CurrentUser> = {}): CurrentUser {
   };
 }
 
+function acceptAs(invited: typeof users.$inferSelect, token: string) {
+  const { id, email, name } = invited;
+  return invitationService.accept(token, user({ id, email, name }));
+}
+
 async function addMember(name: string) {
   const [organization] = await db.insert(organizations).values({ name: 'Test' }).returning();
-  const created = await createUser(db, { name, email: email(), password });
+  const created = await addUser(name);
   const [member] = await db
     .insert(members)
     .values({ organizationId: organization.id, userId: created.id })
@@ -56,7 +63,7 @@ async function addMember(name: string) {
 }
 
 async function addColleague(member: CurrentMember, name: string) {
-  const created = await createUser(db, { name, email: email(), password });
+  const created = await addUser(name);
   const [colleague] = await db
     .insert(members)
     .values({ organizationId: member.organizationId, userId: created.id })
@@ -68,12 +75,14 @@ describe('claiming an install', () => {
   // These run in the order written: the install is claimed for good by the last one.
   let install: InstallService;
   let token: string;
-  const input = { name: 'First Person', email: email(), password };
+  let first: CurrentUser;
 
   beforeAll(async () => {
     await db.delete(users).where(eq(users.isOperator, true));
     install = new InstallService(db);
     token = (install as unknown as { setupToken: string }).setupToken;
+    const created = await addUser('First Person');
+    first = user({ id: created.id, email: created.email, isOperator: false });
   });
 
   it('starts unclaimed', async () => {
@@ -81,24 +90,22 @@ describe('claiming an install', () => {
   });
 
   it('refuses the wrong setup token', async () => {
-    await expect(install.claim({ ...input, token: 'wrong' })).rejects.toThrow('setup token');
+    await expect(install.claim(first, { token: 'wrong' })).rejects.toThrow('setup token');
     await expect(install.claimed()).resolves.toBe(false);
   });
 
-  it('makes whoever has the token its Operator, who can then sign in', async () => {
-    await install.claim({ ...input, token });
+  it('makes whoever has the token its Operator', async () => {
+    await install.claim(first, { token });
     await expect(install.claimed()).resolves.toBe(true);
-    const [operator] = await db.select().from(users).where(eq(users.email, input.email));
+    const [operator] = await db.select().from(users).where(eq(users.id, first.id));
     expect(operator.isOperator).toBe(true);
-    await expect(
-      auth.api.signInEmail({ body: { email: input.email, password } }),
-    ).resolves.toMatchObject({ user: { email: input.email } });
   });
 
   it('can only happen once, even with the token', async () => {
-    await expect(install.claim({ ...input, email: email(), token })).rejects.toThrow(
-      'already claimed',
-    );
+    const second = await addUser('Second Person');
+    await expect(
+      install.claim(user({ id: second.id, isOperator: false }), { token }),
+    ).rejects.toThrow('already claimed');
   });
 
   it('allows one Operator, whatever the code does', async () => {
@@ -125,7 +132,6 @@ describe('Organizations', () => {
       organizationName: 'Example GmbH',
       invitedBy: 'Olga Operator',
       email: first,
-      hasAccount: false,
     });
     const rows = await db.select().from(members).where(eq(members.organizationId, id));
     expect(rows).toHaveLength(0);
@@ -160,19 +166,16 @@ describe('Organizations', () => {
 });
 
 describe('invitations', () => {
-  it('create an account and a Member, and appear in the Audit trail', async () => {
+  it('create a Member, and appear in the Audit trail', async () => {
     const inviter = await addMember('Anna');
-    const invited = email();
-    const { token } = await invitationService.invite(inviter, invited);
+    const invited = await addUser('New Person');
+    const { token } = await invitationService.invite(inviter, invited.email);
     expect(await invitationService.list(inviter.organizationId)).toMatchObject([
-      { email: invited, invitedBy: 'Anna' },
+      { email: invited.email, invitedBy: 'Anna' },
     ]);
 
-    await invitationService.acceptWithNewAccount(token, { name: 'New Person', password });
+    await acceptAs(invited, token);
 
-    await expect(
-      auth.api.signInEmail({ body: { email: invited, password } }),
-    ).resolves.toMatchObject({ user: { name: 'New Person' } });
     const list = await memberService.list(inviter.organizationId);
     expect(list.map(({ name }) => name)).toEqual(['Anna', 'New Person']);
     expect(await invitationService.list(inviter.organizationId)).toEqual([]);
@@ -190,11 +193,10 @@ describe('invitations', () => {
 
   it('work once', async () => {
     const inviter = await addMember('Anna');
-    const { token } = await invitationService.invite(inviter, email());
-    await invitationService.acceptWithNewAccount(token, { name: 'Once', password });
-    await expect(
-      invitationService.acceptWithNewAccount(token, { name: 'Twice', password }),
-    ).rejects.toThrow('no longer works');
+    const invited = await addUser('Once');
+    const { token } = await invitationService.invite(inviter, invited.email);
+    await acceptAs(invited, token);
+    await expect(acceptAs(invited, token)).rejects.toThrow('no longer works');
   });
 
   it('expire', async () => {
@@ -240,15 +242,11 @@ describe('invitations', () => {
     );
   });
 
-  it('make someone with an account sign in, as the person invited', async () => {
+  it('only let in the person invited', async () => {
     const inviter = await addMember('Anna');
     const elsewhere = await addMember('Ben');
     const { token } = await invitationService.invite(inviter, elsewhere.email);
 
-    await expect(invitationService.find(token)).resolves.toMatchObject({ hasAccount: true });
-    await expect(
-      invitationService.acceptWithNewAccount(token, { name: 'Ben again', password }),
-    ).rejects.toThrow('Sign in to accept');
     await expect(
       invitationService.accept(token, user({ email: inviter.email })),
     ).rejects.toThrow('This invitation is for');
@@ -259,6 +257,22 @@ describe('invitations', () => {
     );
     const list = await memberService.list(inviter.organizationId);
     expect(list.map(({ name }) => name)).toEqual(['Anna', 'Ben']);
+  });
+
+  it('open the Organization in the session that accepts', async () => {
+    const inviter = await addMember('Anna');
+    const invited = await addUser('New Person');
+    const sessionId = randomUUID();
+    await db.insert(sessions).values({ id: sessionId, userId: invited.id });
+    const { token } = await invitationService.invite(inviter, invited.email);
+
+    await invitationService.accept(
+      token,
+      user({ id: invited.id, email: invited.email, name: invited.name, sessionId }),
+    );
+
+    const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
+    expect(session.activeOrganizationId).toBe(inviter.organizationId);
   });
 });
 

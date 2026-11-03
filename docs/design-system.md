@@ -137,6 +137,7 @@ Base components live in `components/ui/`. They started as stock shadcn and are o
 | `CopyLink` | `copy-link.tsx` | An invitation link, shown once |
 | `Field`, `FieldGrid` | `field.tsx` | Label and control, and a grid of them |
 | `EntryPage` | `entry-page.tsx` | Pages outside the app: claim, sign-in, invitation |
+| `ClerkSignIn` | `clerk-sign-in.tsx` | Clerk's sign-in, inside an `EntryPage` |
 | `DetailLayout` | `detail-layout.tsx` | Main column with a side column that drops below it |
 | `MainCell`, `DataCell`, `Ref`, `RecordLink`, `TextLink` | `table-parts.tsx` | Cells and links inside registers |
 

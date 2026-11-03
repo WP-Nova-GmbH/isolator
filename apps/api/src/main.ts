@@ -2,18 +2,13 @@ import 'reflect-metadata';
 import { join } from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { toNodeHandler } from 'better-auth/node';
 import { AppModule } from './app.module';
-import { AUTH } from './auth/auth.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const server = app.getHttpAdapter().getInstance();
   app.setGlobalPrefix('api');
   app.enableShutdownHooks();
-  // Goes before the body parser, because better-auth reads the request body itself.
-  server.all('/api/auth/*splat', toNodeHandler(app.get(AUTH)));
-  app.useBodyParser('json');
 
   // The production image serves the web app from here, so it shares one address with the API.
   const webDir = process.env.WEB_DIR;

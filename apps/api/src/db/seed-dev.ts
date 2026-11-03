@@ -1,9 +1,7 @@
 import 'dotenv/config';
-import { hashPassword } from 'better-auth/crypto';
 import { eq, inArray } from 'drizzle-orm';
 import { createDb } from './client';
 import {
-  accounts,
   assets,
   auditEvents,
   controls,
@@ -34,14 +32,17 @@ import { formatSupplierRef } from '../suppliers/supplier-rules';
 // Sample Organization for local development. Run after db:seed. Does nothing if it already exists.
 const ORGANIZATION = 'WP Nova';
 
-// Everyone below signs in with this password. Development only: nothing here runs in production.
-const PASSWORD = 'isolator-dev-password';
-
-// Anna claimed this install, so she is its Operator.
+// Anna claimed this install, so she is its Operator. On a Clerk development instance these are
+// test addresses: they receive no email, and 424242 is their verification code.
 const people = [
-  { name: 'Anna Keller', email: 'anna@example.com', joined: '2026-07-01', isOperator: true },
-  { name: 'Jonas Weber', email: 'jonas@example.com', joined: '2026-07-03' },
-  { name: 'Lea Fischer', email: 'lea@example.com', joined: '2026-08-12' },
+  {
+    name: 'Anna Keller',
+    email: 'anna+clerk_test@example.com',
+    joined: '2026-07-01',
+    isOperator: true,
+  },
+  { name: 'Jonas Weber', email: 'jonas+clerk_test@example.com', joined: '2026-07-03' },
+  { name: 'Lea Fischer', email: 'lea+clerk_test@example.com', joined: '2026-08-12' },
 ];
 
 const sampleSuppliers = [
@@ -382,7 +383,6 @@ async function main() {
     return;
   }
 
-  const password = await hashPassword(PASSWORD);
   await db.transaction(async (tx) => {
     const [organization] = await tx
       .insert(organizations)
@@ -392,18 +392,13 @@ async function main() {
 
     const memberIds = new Map<string, string>();
     for (const person of people) {
-      const [user] = await tx
-        .insert(users)
-        .values({ name: person.name, email: person.email, isOperator: person.isOperator })
-        .onConflictDoUpdate({
-          target: users.email,
-          set: { name: person.name, isOperator: person.isOperator },
-        })
-        .returning();
-      await tx.delete(accounts).where(eq(accounts.userId, user.id));
-      await tx
-        .insert(accounts)
-        .values({ userId: user.id, accountId: user.id, providerId: 'credential', password });
+      const [existing] = await tx.select().from(users).where(eq(users.email, person.email));
+      const [user] = existing
+        ? [existing]
+        : await tx
+            .insert(users)
+            .values({ name: person.name, email: person.email, isOperator: person.isOperator })
+            .returning();
       const [member] = await tx
         .insert(members)
         .values({ organizationId, userId: user.id, createdAt: new Date(person.joined) })

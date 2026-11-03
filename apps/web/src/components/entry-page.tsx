@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { Form } from 'react-router';
 import { FormError } from '@/components/form-error';
 import { Logo } from '@/components/logo';
 
@@ -22,10 +21,8 @@ export function EntryPage({ title, description, error, footer, children }: Entry
           {description && <p className="mt-1 text-muted-foreground">{description}</p>}
         </div>
         <FormError message={error} />
-        <Form method="post" className="flex flex-col gap-4">
-          {children}
-        </Form>
-        {footer && <p className="text-xs text-muted-foreground">{footer}</p>}
+        {children}
+        {footer &&<p className="text-xs text-muted-foreground">{footer}</p>}
       </div>
     </main>
   );

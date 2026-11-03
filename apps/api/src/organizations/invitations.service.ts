@@ -9,7 +9,6 @@ import { and, asc, eq, gt, isNull } from 'drizzle-orm';
 import { createHash, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { recordEvent } from '../audit/audit-trail';
-import { createUser, passwordInput } from '../auth/auth';
 import { DB, type Database } from '../db/db.module';
 import { invitations, members, organizations, sessions, users } from '../db/schema';
 import type { CurrentMember, CurrentUser } from '../members/current-member';
@@ -18,11 +17,6 @@ const VALID_FOR_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const invitationInput = z.object({
   email: z.email('That isn’t an email address.').toLowerCase(),
-});
-
-export const newAccountInput = z.object({
-  name: z.string().trim().min(1, 'Give your name.'),
-  password: passwordInput,
 });
 
 function hashToken(token: string) {
@@ -132,29 +126,11 @@ export class InvitationsService {
   /** What the invitation page shows. Holding the link is what allows it. */
   async find(token: string) {
     const invitation = await this.open(this.db, token);
-    const [account] = await this.db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.email, invitation.email));
     return {
       organizationName: invitation.organizationName,
       invitedBy: invitation.invitedByName,
       email: invitation.email,
-      hasAccount: account !== undefined,
     };
-  }
-
-  async acceptWithNewAccount(token: string, input: z.infer<typeof newAccountInput>) {
-    await this.db.transaction(async (tx) => {
-      const invitation = await this.open(tx, token, true);
-      const [account] = await tx
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.email, invitation.email));
-      if (account) throw new ConflictException('You already have an account. Sign in to accept.');
-      const user = await createUser(tx, { ...input, email: invitation.email });
-      await this.join(tx, invitation, user);
-    });
   }
 
   async accept(token: string, user: CurrentUser) {

@@ -1,7 +1,10 @@
+import { ClerkProvider } from '@clerk/react';
+import { shadcn } from '@clerk/ui/themes';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, RouterProvider } from 'react-router';
+import { createBrowserRouter, RouterProvider, type RouteObject } from 'react-router';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { api } from '@/lib/api';
 import { appLoader } from '@/lib/members';
 import './index.css';
 import {
@@ -39,7 +42,7 @@ import { NonconformityNew, nonconformityNewAction } from './routes/nonconformity
 import { NotFound } from './routes/not-found';
 import { Organizations, organizationsAction, organizationsLoader } from './routes/organizations';
 import { Overview, overviewLoader } from './routes/overview';
-import { RouteError } from './routes/route-error';
+import { ApiUnreachable, RouteError } from './routes/route-error';
 import { RiskAssessment, riskAssessmentLoader } from './routes/risk-assessment';
 import {
   RiskAssessments,
@@ -50,7 +53,7 @@ import { RiskCriteria, riskCriteriaAction, riskCriteriaLoader } from './routes/r
 import { RiskDetail, riskDetailAction, riskDetailLoader } from './routes/risk-detail';
 import { RiskNew, riskNewAction } from './routes/risk-new';
 import { Risks, risksLoader } from './routes/risks';
-import { SignIn, signInAction, signInLoader, signOutAction } from './routes/sign-in';
+import { SignIn, signInLoader } from './routes/sign-in';
 import { Soa, soaAction, soaLoader } from './routes/soa';
 import { SoaEntry, soaEntryAction, soaEntryLoader } from './routes/soa-entry';
 import { SupplierDetail, supplierDetailAction, supplierDetailLoader } from './routes/supplier-detail';
@@ -58,7 +61,7 @@ import { SupplierNew, supplierNewAction } from './routes/supplier-new';
 import { Suppliers, suppliersLoader } from './routes/suppliers';
 import { Tasks, tasksAction, tasksLoader } from './routes/tasks';
 
-const router = createBrowserRouter([
+const routes: RouteObject[] = [
   {
     id: 'app',
     element: <Layout />,
@@ -181,11 +184,9 @@ const router = createBrowserRouter([
   {
     path: 'sign-in',
     loader: signInLoader,
-    action: signInAction,
     element: <SignIn />,
     errorElement: <RouteError fullPage />,
   },
-  { path: 'sign-out', action: signOutAction },
   {
     path: 'invite/:token',
     loader: acceptInviteLoader,
@@ -200,12 +201,28 @@ const router = createBrowserRouter([
     element: <Organizations />,
     errorElement: <RouteError fullPage />,
   },
-]);
+];
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <TooltipProvider>
-      <RouterProvider router={router} />
-    </TooltipProvider>
-  </StrictMode>,
-);
+async function start() {
+  const root = createRoot(document.getElementById('root')!);
+  const install = await api<{ clerkPublishableKey: string }>('/install', {
+    signedOut: true,
+  }).catch(() => null);
+  if (!install) return root.render(<ApiUnreachable />);
+
+  root.render(
+    <StrictMode>
+      <ClerkProvider
+        publishableKey={install.clerkPublishableKey}
+        afterSignOutUrl="/sign-in"
+        appearance={{ theme: shadcn }}
+      >
+        <TooltipProvider>
+          <RouterProvider router={createBrowserRouter(routes)} />
+        </TooltipProvider>
+      </ClerkProvider>
+    </StrictMode>,
+  );
+}
+
+void start();

@@ -23,7 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { api, attempt, refused } from '@/lib/api';
-import { changePassword, invitationLink } from '@/lib/auth';
+import { invitationLink } from '@/lib/auth';
 import { useAppData, type Invitation, type Member } from '@/lib/members';
 
 export function membersLoader() {
@@ -41,12 +41,6 @@ export async function membersAction({ request }: ActionFunctionArgs) {
         body: { email: form.get('email') },
       });
       return { link: invitationLink(token) };
-    });
-  }
-  if (form.get('intent') === 'change-password') {
-    return refused(async () => {
-      await changePassword(form);
-      return { passwordChanged: true };
     });
   }
   return attempt(async () => {
@@ -101,7 +95,6 @@ export function Members() {
   const result = useActionData<typeof membersAction>();
   const navigation = useNavigation();
   const saving = navigation.state !== 'idle';
-  const passwordChanged = result && 'passwordChanged' in result;
 
   return (
     <>
@@ -207,44 +200,6 @@ export function Members() {
         </Form>
       </Card>
 
-      <Card aria-label="Your password" className="flex flex-col gap-4">
-        <h2>Your password</h2>
-        {passwordChanged && <p>Your password is changed. Other browsers are signed out.</p>}
-        <Form key={String(passwordChanged)} method="post" className="flex flex-col gap-4">
-          <FieldGrid>
-            <Field label="Current password" htmlFor="current-password">
-              <Input
-                id="current-password"
-                name="currentPassword"
-                type="password"
-                autoComplete="current-password"
-                required
-              />
-            </Field>
-            <Field label="New password, at least 12 characters" htmlFor="new-password">
-              <Input
-                id="new-password"
-                name="newPassword"
-                type="password"
-                autoComplete="new-password"
-                minLength={12}
-                required
-              />
-            </Field>
-          </FieldGrid>
-          <div>
-            <Button
-              type="submit"
-              name="intent"
-              value="change-password"
-              variant="outline"
-              disabled={saving}
-            >
-              Change password
-            </Button>
-          </div>
-        </Form>
-      </Card>
     </>
   );
 }

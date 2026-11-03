@@ -1,3 +1,4 @@
+import { getToken } from '@clerk/react';
 import { redirect } from 'react-router';
 
 export class ApiError extends Error {
@@ -13,19 +14,24 @@ interface ApiRequest {
   method?: string;
   /** Sent as JSON, or as it is if it's a FormData. */
   body?: unknown;
-  /** For the pages outside the app: a 401 is an answer here, not a reason to go to sign-in. */
+  /** For what works without signing in, so it doesn't wait for Clerk to load. */
   signedOut?: boolean;
 }
 
 /** The raw response, for anything that isn't JSON. Throws ApiError on a refusal. */
 export async function apiResponse(path: string, { method, body, signedOut }: ApiRequest = {}) {
   const isJson = body !== undefined && !(body instanceof FormData);
+  const token = signedOut ? null : await getToken();
   const response = await fetch(`/api${path}`, {
     method,
-    headers: isJson ? { 'content-type': 'application/json' } : undefined,
+    headers: {
+      ...(isJson && { 'content-type': 'application/json' }),
+      ...(token && { authorization: `Bearer ${token}` }),
+    },
     body: isJson ? JSON.stringify(body) : (body as FormData | undefined),
   });
-  if (response.status === 401 && !signedOut) throw redirect('/sign-in');
+  // A token the API refuses stays an error: signing in again would only bring it back here.
+  if (response.status === 401 && !token) throw redirect('/sign-in');
   if (!response.ok) {
     const error = await response.json().catch(() => null);
     throw new ApiError(response.status, error?.message ?? response.statusText);

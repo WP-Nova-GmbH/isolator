@@ -19,6 +19,9 @@ docs/adr   architecture decision records
 nvm use               # Node 24
 npm install
 cp apps/api/.env.example apps/api/.env
+npx clerk@latest auth login
+npx clerk@latest link                            # choose the Isolator application
+npx clerk@latest env pull --file apps/api/.env   # Clerk development keys
 npm run db:up         # Postgres on localhost:5440
 npm run db:migrate
 npm run db:seed       # Annex A 2022 control catalog
@@ -36,15 +39,11 @@ To scan uploads for viruses, set `CLAMAV_HOST`. Isolator then refuses an infecte
 
 ### Signing in
 
-`npm run db:seed:dev` creates three people to sign in as; their emails and password are at the top of [seed-dev.ts](apps/api/src/db/seed-dev.ts). Anna Keller is the Operator.
+Sign-in runs on Clerk. `npm run db:seed:dev` creates three people, with the emails at the top of [seed-dev.ts](apps/api/src/db/seed-dev.ts). These are Clerk test addresses: sign up with one and enter `424242` as the verification code. Anna Keller is the Operator.
 
-A new install has nobody to sign in as, so the app opens on Claim. The setup token for it is in the API's logs, and it changes each time the API starts. Whoever claims the install becomes its Operator and creates its Organizations.
+A new install has nobody to sign in as, so the app opens on Claim. Sign in, then enter the setup token from the API's logs, which changes each time the API starts. Whoever claims the install becomes its Operator and creates its Organizations.
 
-Isolator sends no email. Invitations are links you pass on yourself, and whoever runs the server resets a forgotten password:
-
-```sh
-npm run auth:reset-password -w api -- someone@example.com
-```
+Invitations are links you pass on yourself. A Clerk account alone opens no Organization. People manage their name, email and password from the menu on their avatar, and a change reaches Isolator the next time they sign in.
 
 ## Production
 

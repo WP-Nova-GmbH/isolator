@@ -15,16 +15,15 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:seed:dev": "tsx src/db/seed-dev.ts",
-    "db:studio": "drizzle-kit studio",
-    "auth:reset-password": "tsx src/auth/reset-password.ts"
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1161.0",
+    "@clerk/backend": "3.26.5",
     "@nestjs/common": "^12.3.2",
     "@nestjs/config": "^12.0.1",
     "@nestjs/core": "^12.3.2",
     "@nestjs/platform-express": "^12.3.2",
-    "better-auth": "1.7.15",
     "dotenv": "^18.0.9",
     "drizzle-orm": "^0.45.4",
     "postgres": "^3.4.9",

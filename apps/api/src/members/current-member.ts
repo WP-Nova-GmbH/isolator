@@ -7,13 +7,12 @@ import {
   type CanActivate,
   type ExecutionContext,
 } from '@nestjs/common';
-import { fromNodeHeaders } from 'better-auth/node';
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import type { IncomingHttpHeaders } from 'node:http';
-import type { Auth } from '../auth/auth';
+import { startSession, type Auth } from '../auth/auth';
 import { AUTH } from '../auth/auth.module';
 import { DB, type Database } from '../db/db.module';
-import { members, organizations, users } from '../db/schema';
+import { members, organizations, sessions, users } from '../db/schema';
 
 export interface CurrentMember {
   id: string;
@@ -39,20 +38,26 @@ interface SignedInRequest {
   member?: CurrentMember;
 }
 
-async function signedInUser(auth: Auth, db: Database, request: SignedInRequest) {
-  const found = await auth.api.getSession({ headers: fromNodeHeaders(request.headers) });
-  if (!found) throw new UnauthorizedException('Sign in first.');
-  const [{ isOperator }] = await db
-    .select({ isOperator: users.isOperator })
-    .from(users)
-    .where(eq(users.id, found.user.id));
+async function signedInUser(
+  auth: Auth,
+  db: Database,
+  request: SignedInRequest,
+): Promise<CurrentUser> {
+  const session = await auth.session(request.headers.authorization);
+  if (!session) throw new UnauthorizedException('Sign in first.');
+  const [known] = await db
+    .select({ user: users, activeOrganizationId: sessions.activeOrganizationId })
+    .from(sessions)
+    .innerJoin(users, eq(users.id, sessions.userId))
+    .where(eq(sessions.id, session.id));
+  const user = known?.user ?? (await startSession(auth, db, session));
   return {
-    id: found.user.id,
-    name: found.user.name,
-    email: found.user.email,
-    isOperator,
-    sessionId: found.session.id,
-    activeOrganizationId: found.session.activeOrganizationId ?? null,
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    isOperator: user.isOperator,
+    sessionId: session.id,
+    activeOrganizationId: known?.activeOrganizationId ?? null,
   };
 }
 
