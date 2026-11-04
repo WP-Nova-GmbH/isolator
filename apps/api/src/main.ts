@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
+import { servesWebApp } from './web-app';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -14,9 +15,13 @@ async function bootstrap() {
   const webDir = process.env.WEB_DIR;
   if (webDir) {
     app.useStaticAssets(webDir);
-    // The web app has its own routes, but a missing file in assets/ stays a 404.
-    server.get(/^\/(?!api(\/|$)|assets\/)/, (_req: unknown, res: { sendFile(path: string): void }) =>
-      res.sendFile(join(webDir, 'index.html')),
+    server.get(
+      /.*/,
+      (
+        req: { path: string },
+        res: { sendFile(path: string): void },
+        next: () => void,
+      ) => (servesWebApp(req.path) ? res.sendFile(join(webDir, 'index.html')) : next()),
     );
   }
 
