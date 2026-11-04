@@ -51,4 +51,4 @@ One container serves the API and the web app, and Postgres runs outside it. [doc
 
 ## License
 
-MIT, see [LICENSE](LICENSE). ISO control references and English control titles are excluded.
+MIT, see [LICENSE](LICENSE). ISO control references and English control titles are excluded, see [NOTICE](NOTICE).
