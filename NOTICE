@@ -3,6 +3,10 @@ Copyright (c) 2026 WP Nova GmbH
 
 Isolator is licensed under the MIT License, see LICENSE.
 
-The ISO/IEC 27001 control references and English control titles in
-apps/api/src/controls/annex-a-2022.ts belong to their rights holders and are
-not covered by the MIT License.
+The ISO/IEC 27001:2022 control references and English control titles in
+apps/api/src/controls/annex-a-2022.ts are (c) ISO/IEC 2022 and belong to ISO and
+IEC. They are not covered by the MIT License. The standard can be bought from
+https://www.iso.org/standard/27001.
+
+Isolator is not affiliated with or endorsed by ISO or IEC, and using it does
+not certify anyone. ISO and IEC are trademarks of their respective owners.

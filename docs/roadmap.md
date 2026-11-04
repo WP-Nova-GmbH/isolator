@@ -51,7 +51,7 @@ Isolator has to carry an ISMS from nothing to a certificate and beyond. The phas
 
 ## Open questions
 
-- Legal check on ISO control titles under the MIT licence, before the repo goes public.
+- Written permission from ISO/IEC, or DIN Media in Germany, for the Annex A references and titles. Until then they ship excluded from the MIT licence, see NOTICE.
 - How long the Audit trail is kept, and how personal data is erased from it.
 - Background jobs: pg-boss (Postgres only) vs. BullMQ (Redis).
 - AI provider, data residency, and how customer data is kept out of training.
