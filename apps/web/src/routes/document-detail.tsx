@@ -18,7 +18,7 @@ import { Field } from '@/components/field';
 import { EditDialog, FormDialog, FormDialogBody, FormDialogFooter } from '@/components/form-dialog';
 import { FormError } from '@/components/form-error';
 import { HistoryList } from '@/components/history-list';
-import { LifecycleCard, type LifecycleAction } from '@/components/lifecycle-card';
+import { LifecycleMenu, type LifecycleAction } from '@/components/lifecycle-menu';
 import { PageHeader, SectionHeader } from '@/components/page-header';
 import { StateBadge } from '@/components/state-badge';
 import { Ref } from '@/components/table-parts';
@@ -224,6 +224,7 @@ export function DocumentDetail() {
                 <DocumentFields document={doc} contentLocked={!draft} />
               </EditDialog>
             )}
+            <LifecycleMenu {...lifecycleProps(doc)} />
           </>
         }
       />
@@ -281,7 +282,6 @@ export function DocumentDetail() {
                 <p className="text-muted-foreground">Not linked to an SoA entry yet.</p>
               )}
             </Card>
-            <LifecycleCard key={String(withdrawn)} {...lifecycleProps(doc)} />
             <Card aria-label="History" className="flex flex-col gap-3">
               <h2>History</h2>
               <HistoryList items={historyItems(doc.history)} />
@@ -289,7 +289,7 @@ export function DocumentDetail() {
           </>
         }
       >
-        <Card aria-label="Document">
+        <section aria-label="Document">
           <Facts>
             <Fact label="Kind">{documentKindLabels[doc.kind]}</Fact>
             <Fact label="Owner">{doc.ownerName}</Fact>
@@ -297,15 +297,15 @@ export function DocumentDetail() {
               {doc.datedOn}
             </Fact>
           </Facts>
-        </Card>
-        <Card aria-label="Content" className="flex flex-col gap-3">
+        </section>
+        <section aria-label="Content" className="flex flex-col gap-3">
           <h2>Content</h2>
           {doc.content ? (
             <div className="break-words whitespace-pre-wrap">{doc.content}</div>
           ) : (
             <p className="text-muted-foreground">No content yet.</p>
           )}
-        </Card>
+        </section>
         <FileCard doc={doc} editable={draft && !locked} />
       </DetailLayout>
     </>

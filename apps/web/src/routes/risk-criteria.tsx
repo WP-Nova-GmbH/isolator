@@ -6,7 +6,6 @@ import { PageHeader } from '@/components/page-header';
 import { RiskChip, type RiskBand } from '@/components/risk-score';
 import { RiskTabs } from '@/components/tab-nav';
 import { MainCell, Ref } from '@/components/table-parts';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -127,7 +126,7 @@ export function RiskCriteria() {
       />
       <RiskTabs />
 
-      <Card aria-label="Acceptance threshold" className="flex flex-col gap-4">
+      <section aria-label="Acceptance threshold" className="flex flex-col gap-4">
         <h2>Acceptance threshold</h2>
         <Facts>
           <Fact label="Highest score you accept without treatment">
@@ -142,7 +141,7 @@ export function RiskCriteria() {
             </span>
           ))}
         </div>
-      </Card>
+      </section>
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(20rem,100%),1fr))] gap-8">
         <LevelTable title="Likelihood" levels={criteria.likelihoodLevels} />

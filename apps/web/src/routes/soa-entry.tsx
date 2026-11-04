@@ -173,7 +173,7 @@ export function SoaEntry() {
           </>
         }
       >
-        <Card aria-label="Decision" className="flex flex-col gap-4">
+        <section aria-label="Decision" className="flex flex-col gap-4">
           <h2>Decision</h2>
           <Facts>
             <Fact label="Applies">{entry.applicable ? 'Yes' : 'No'}</Fact>
@@ -185,7 +185,7 @@ export function SoaEntry() {
               {entry.justification}
             </Fact>
           </Facts>
-        </Card>
+        </section>
 
         <section className="flex flex-col gap-3">
           <SectionHeader title="Evidence">

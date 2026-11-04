@@ -13,7 +13,7 @@ import { Fact, Facts } from '@/components/facts';
 import { EditDialog } from '@/components/form-dialog';
 import { FormError } from '@/components/form-error';
 import { HistoryList } from '@/components/history-list';
-import { LifecycleCard, type LifecycleAction } from '@/components/lifecycle-card';
+import { LifecycleMenu, type LifecycleAction } from '@/components/lifecycle-menu';
 import { LinkedItem, LinkPicker } from '@/components/link-picker';
 import { NewTaskForm } from '@/components/new-task-form';
 import { PageHeader, SectionHeader } from '@/components/page-header';
@@ -201,6 +201,7 @@ export function RiskDetail() {
                 <RiskFields risk={risk} />
               </EditDialog>
             )}
+            <LifecycleMenu {...lifecycleProps(risk, risk.ownerId === me.id)} />
           </>
         }
       />
@@ -216,10 +217,6 @@ export function RiskDetail() {
         aside={
           <>
             {!closed && <ConfirmationCard {...confirmationCardProps(risk, me.id)} />}
-            <LifecycleCard
-              key={String(closed)}
-              {...lifecycleProps(risk, risk.ownerId === me.id)}
-            />
             <Card aria-label="History" className="flex flex-col gap-3">
               <h2>History</h2>
               <HistoryList items={historyItems(risk.history)} />
@@ -227,7 +224,7 @@ export function RiskDetail() {
           </>
         }
       >
-        <Card aria-label="Risk">
+        <section aria-label="Risk">
           <Facts>
             <Fact label="What could happen" empty="Not described yet" wide>
               {risk.description}
@@ -242,7 +239,7 @@ export function RiskDetail() {
             <Fact label="Risk owner">{risk.ownerName}</Fact>
             <Fact label="Review on">{risk.reviewOn}</Fact>
           </Facts>
-        </Card>
+        </section>
 
         <section className="flex flex-col gap-3">
           <SectionHeader title="Treatment Tasks">

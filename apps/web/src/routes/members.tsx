@@ -18,7 +18,6 @@ import { InvitationDialog } from '@/components/invitation-dialog';
 import { PageHeader, SectionHeader } from '@/components/page-header';
 import { DataCell, EmptyRow, MainCell } from '@/components/table-parts';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import {
@@ -287,7 +286,7 @@ export function Members() {
         </Table>
       </section>
 
-      <Card aria-label="Organization settings" className="flex flex-col gap-4">
+      <section aria-label="Organization settings" className="flex flex-col gap-4">
         <SectionHeader title="Organization settings">
           {canAdminister && (
             <EditDialog title="Rename the Organization" label="Rename" size="md" intent="rename">
@@ -305,7 +304,7 @@ export function Members() {
         <Facts>
           <Fact label="Organization name">{me.organizationName}</Fact>
         </Facts>
-      </Card>
+      </section>
 
     </>
   );

@@ -12,7 +12,7 @@ import { Fact, Facts } from '@/components/facts';
 import { EditDialog } from '@/components/form-dialog';
 import { FormError } from '@/components/form-error';
 import { HistoryList } from '@/components/history-list';
-import { LifecycleCard, type LifecycleAction } from '@/components/lifecycle-card';
+import { LifecycleMenu, type LifecycleAction } from '@/components/lifecycle-menu';
 import { UNASSIGNED, UNKNOWN } from '@/components/owner-select';
 import { PageHeader } from '@/components/page-header';
 import { RecordLink, Ref } from '@/components/table-parts';
@@ -110,11 +110,14 @@ export function AssetDetail() {
         title={asset.name}
         back={{ to: '/assets', label: 'Assets' }}
         actions={
-          !locked && (
-            <EditDialog title="Edit asset">
-              <AssetFields asset={asset} suppliers={suppliers} />
-            </EditDialog>
-          )
+          <>
+            {!locked && (
+              <EditDialog title="Edit asset">
+                <AssetFields asset={asset} suppliers={suppliers} />
+              </EditDialog>
+            )}
+            <LifecycleMenu {...lifecycleProps(asset)} />
+          </>
         }
       />
       <FormError message={result?.error} />
@@ -128,7 +131,6 @@ export function AssetDetail() {
       <DetailLayout
         aside={
           <>
-            <LifecycleCard key={String(retired)} {...lifecycleProps(asset)} />
             <Card aria-label="History" className="flex flex-col gap-3">
               <h2>History</h2>
               <HistoryList items={historyItems(asset.history)} />
@@ -136,7 +138,7 @@ export function AssetDetail() {
           </>
         }
       >
-        <Card aria-label="Asset">
+        <section aria-label="Asset">
           <Facts>
             <Fact label="Type">{assetTypeLabels[asset.type]}</Fact>
             <Fact label="Status">{assetStatusLabels[asset.status]}</Fact>
@@ -160,9 +162,9 @@ export function AssetDetail() {
               {asset.location}
             </Fact>
           </Facts>
-        </Card>
+        </section>
 
-        <Card aria-label="Record" className="flex flex-col gap-4">
+        <section aria-label="Record" className="flex flex-col gap-4">
           <h2>Record</h2>
           <Facts>
             <Fact label="Validation">{validationLabels[asset.validation]}</Fact>
@@ -171,9 +173,9 @@ export function AssetDetail() {
               {asset.notes}
             </Fact>
           </Facts>
-        </Card>
+        </section>
 
-        <Card aria-label="Open risks" className="flex flex-col gap-3">
+        <section aria-label="Open risks" className="flex flex-col gap-3">
           <h2>Open risks</h2>
           {asset.risks.map((risk) => (
             <div key={risk.ref} className="flex items-baseline gap-2">
@@ -186,7 +188,7 @@ export function AssetDetail() {
           {asset.risks.length === 0 && (
             <p className="text-muted-foreground">No open risks touch this asset.</p>
           )}
-        </Card>
+        </section>
       </DetailLayout>
     </>
   );

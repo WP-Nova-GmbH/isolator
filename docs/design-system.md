@@ -14,6 +14,13 @@ This is the rule every page follows. A page shows the ISMS as it stands. The ISM
 - **No inputs sit open on a page.** There are two exceptions. Controls that only change what you see, such as a filter or the language, stay on the page. So do pages whose only job is to create something, such as Add Supplier.
 - **Confirming confirms what the page shows,** which is what is saved.
 
+A record's page is laid out so that it never feels crowded:
+
+- **Header:** the record's name, with a one-line description under it when there is one (what a Supplier provides). On the right: its state, **Edit**, and a ⋯ menu for rare actions such as ending, closing or deleting it.
+- **Facts:** directly on the sheet, without a box.
+- **Related records** (files, reviews, Tasks, linked assets): below the facts. When there are several kinds, they go in tabs with a count each, one shown at a time. The open tab's action, such as Add file, sits to the right of the tabs.
+- **Side column:** what needs the reader, such as a Confirmation or what needs attention, and the record's History.
+
 A page full of inputs looks unfinished, invites changes nobody meant to make, and hides which facts are missing. A dialog makes each change deliberate and easy to back out of, and the Audit trail records only what someone meant to do.
 
 Build the read-only view with `Facts`, a record's Edit dialog with `EditDialog`, and any other form with `FormDialog`. Field components such as `SupplierFields` group their fields with `FieldSection`: a card on a create page, a plain group inside a dialog.
@@ -114,7 +121,7 @@ Base styles set the headings: page title 26 px, section 15 px. Body and table te
 ## Shape and space
 
 - Radius: `rounded-sm` (6 px) for score chips, `rounded-md` (8 px) for buttons and inputs, `rounded-lg` (12 px) for cards and the page sheet, `rounded-xl` (16 px) for the sign-in card. Status badges are `rounded-full`.
-- The navigation sits on the ground and each page is one raised sheet. Borders separate things inside the sheet. Tables sit directly on the sheet, without a box.
+- The navigation sits on the ground and each page is one raised sheet. Borders separate things inside the sheet. Tables and a record's facts sit directly on the sheet, without a box. Cards are for the side column and for small groups of linked records.
 - Depth comes from four tokens, so it follows the theme: `shadow-xs` for raised controls, `shadow-button` for primary buttons, `shadow-sheet` for the page sheet, `shadow-float` for things that float.
 - Space with flex/grid `gap`, on Tailwind's 4 px scale. Registers and the SoA stay dense, with `py-2` cells; forms use `gap-4`.
 
@@ -129,10 +136,12 @@ Base components live in `components/ui/`. They started as stock shadcn and are o
 | `Table` | `ui/table.tsx` | Registers. Bleeds 10 px past the sheet's padding, so cell text lines up with headings and hover rows reach past it |
 | `Alert` | `ui/alert.tsx` | `destructive` for load failures and blocking errors |
 | `Dialog` | `ui/dialog.tsx` | Every form on a page opens in one. Use it through `FormDialog` |
+| `Tabs` | `ui/tabs.tsx` | A record's related records, one kind at a time. Looks like `TabNav`, which is for tabs that are links |
+| `DropdownMenu` | `ui/dropdown-menu.tsx` | The ⋯ menu on a record's page. Use it through `LifecycleMenu` |
 | `Skeleton` | `ui/skeleton.tsx` | Loading states. The pulse stops under `prefers-reduced-motion` |
 | `Sidebar` | `ui/sidebar.tsx` | App shell, `inset` variant. A 240 px rail on desktop, a sheet on phones |
 | `Input`, `Textarea`, `NativeSelect` | `ui/` | 36 px tall to line up with `Button` |
-| `Label`, `Card` | `ui/` | `Card` is a bordered section; give it its own layout with `flex flex-col gap-*` |
+| `Label`, `Card` | `ui/` | `Card` is a bordered section for the side column or a small group of linked records; give it its own layout with `flex flex-col gap-*` |
 | `Logo`, `Mark` | `logo.tsx` | Theme-aware SVG |
 | `RiskScore`, `RiskChip`, `riskBand` | `risk-score.tsx` | Tinted chip in the risk band's colour |
 | `RiskMatrix` | `risk-matrix.tsx` | The fixed 5 × 5 matrix |
@@ -145,7 +154,7 @@ Base components live in `components/ui/`. They started as stock shadcn and are o
 | `RiskFields` | `risk-fields.tsx` | A risk's fields and live scores. Goes inside a form |
 | `TasksTable`, `NewTaskForm` | `tasks-table.tsx`, `new-task-form.tsx` | Tasks on the Tasks page and on a record. Adding, committing and cancelling open dialogs |
 | `FormError` | `form-error.tsx` | Shows why the API refused what a Member tried |
-| `LifecycleCard` | `lifecycle-card.tsx` | Closing, ending, reopening or deleting a record. Asks for the reason in a dialog |
+| `LifecycleMenu` | `lifecycle-menu.tsx` | The ⋯ menu beside Edit: closing, ending, reopening or deleting a record. Asks for the reason in a dialog |
 | `LinkPicker`, `LinkedItem` | `link-picker.tsx` | Linking records to each other and removing the link |
 | `SupplierFields`, `AssetFields`, `IncidentFields`, `NonconformityFields`, `DocumentFields` | `supplier-fields.tsx`, `asset-fields.tsx`, `incident-fields.tsx`, `nonconformity-fields.tsx`, `document-fields.tsx` | A record's fields. Go inside a form: the create page's, or an `EditDialog` |
 | `EvidenceTable`, `EvidenceForm` | `evidence-table.tsx`, `evidence-form.tsx` | Evidence on the Evidence page and on an SoA entry. The form is a dialog |
@@ -160,7 +169,7 @@ Base components live in `components/ui/`. They started as stock shadcn and are o
 | `DetailLayout` | `detail-layout.tsx` | Main column with a side column that drops below it |
 | `MainCell`, `DataCell`, `Ref`, `RecordLink`, `TextLink` | `table-parts.tsx` | Cells and links inside registers |
 
-`Sheet`, `Separator` and `Tooltip` are installed as parts of `Sidebar`. Icons are [Lucide](https://lucide.dev): 16 px beside text, in `currentColor`.
+`Sheet`, `Separator` and `Tooltip` are installed as parts of `Sidebar`. `DropdownMenu` keeps only the parts we use; add more from shadcn when one is needed. Icons are [Lucide](https://lucide.dev): 16 px beside text, in `currentColor`.
 
 ### Adding shadcn components
 

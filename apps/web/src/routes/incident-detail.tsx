@@ -12,7 +12,7 @@ import { EditDialog } from '@/components/form-dialog';
 import { FormError } from '@/components/form-error';
 import { HistoryList } from '@/components/history-list';
 import { IncidentFields } from '@/components/incident-fields';
-import { LifecycleCard, type LifecycleAction } from '@/components/lifecycle-card';
+import { LifecycleMenu, type LifecycleAction } from '@/components/lifecycle-menu';
 import { NewTaskForm } from '@/components/new-task-form';
 import { PageHeader, SectionHeader } from '@/components/page-header';
 import { StateBadge } from '@/components/state-badge';
@@ -115,6 +115,7 @@ export function IncidentDetail() {
                 <IncidentFields incident={incident} risks={risks} />
               </EditDialog>
             )}
+            <LifecycleMenu {...lifecycleProps(incident)} />
           </>
         }
       />
@@ -131,7 +132,6 @@ export function IncidentDetail() {
       <DetailLayout
         aside={
           <>
-            <LifecycleCard key={String(closed)} {...lifecycleProps(incident)} />
             <Card aria-label="History" className="flex flex-col gap-3">
               <h2>History</h2>
               <HistoryList items={historyItems(incident.history)} />
@@ -139,7 +139,7 @@ export function IncidentDetail() {
           </>
         }
       >
-        <Card aria-label="Incident">
+        <section aria-label="Incident">
           <Facts>
             <Fact label="Details" empty="None" wide>
               {incident.description}
@@ -154,7 +154,7 @@ export function IncidentDetail() {
               )}
             </Fact>
           </Facts>
-        </Card>
+        </section>
 
         <section className="flex flex-col gap-3">
           <SectionHeader title="Tasks">

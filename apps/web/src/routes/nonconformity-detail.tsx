@@ -11,7 +11,7 @@ import { Fact, Facts } from '@/components/facts';
 import { EditDialog } from '@/components/form-dialog';
 import { FormError } from '@/components/form-error';
 import { HistoryList } from '@/components/history-list';
-import { LifecycleCard, type LifecycleAction } from '@/components/lifecycle-card';
+import { LifecycleMenu, type LifecycleAction } from '@/components/lifecycle-menu';
 import { NewTaskForm } from '@/components/new-task-form';
 import { NonconformityFields } from '@/components/nonconformity-fields';
 import { PageHeader, SectionHeader } from '@/components/page-header';
@@ -118,6 +118,7 @@ export function NonconformityDetail() {
                 <NonconformityFields nonconformity={nonconformity} />
               </EditDialog>
             )}
+            <LifecycleMenu {...lifecycleProps(nonconformity)} />
           </>
         }
       />
@@ -134,7 +135,6 @@ export function NonconformityDetail() {
       <DetailLayout
         aside={
           <>
-            <LifecycleCard key={String(closed)} {...lifecycleProps(nonconformity)} />
             <Card aria-label="History" className="flex flex-col gap-3">
               <h2>History</h2>
               <HistoryList items={historyItems(nonconformity.history)} />
@@ -142,7 +142,7 @@ export function NonconformityDetail() {
           </>
         }
       >
-        <Card aria-label="Nonconformity">
+        <section aria-label="Nonconformity">
           <Facts>
             <Fact label="Details" empty="None" wide>
               {nonconformity.description}
@@ -154,7 +154,7 @@ export function NonconformityDetail() {
               {nonconformity.cause}
             </Fact>
           </Facts>
-        </Card>
+        </section>
 
         <section className="flex flex-col gap-3">
           <SectionHeader title="Tasks">
