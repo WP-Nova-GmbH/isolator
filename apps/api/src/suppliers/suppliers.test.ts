@@ -160,8 +160,8 @@ describe('what nobody knows yet', () => {
       contractTerm: null,
       contractEnds: null,
     });
-    expect(supplier.attention).toContain('The contract term is unknown.');
-    expect(supplier.attention).toContain('Nobody owns this Supplier.');
+    expect(supplier.attention).toContain('Contract term unknown');
+    expect(supplier.attention).toContain('No owner');
   });
 
   it('tells a rolling contract from an unknown one, and needs an end date for a fixed one', () => {
@@ -217,11 +217,11 @@ describe('reviews', () => {
     const { ref } = await suppliers.create(org.owner, input(org.owner.id));
     await suppliers.addReview(org.owner, ref, { ...review, outcome: 'concerns' });
     expect((await suppliers.get(org.id, ref)).attention).toContain(
-      'The last review raised concerns.',
+      'Last review raised concerns',
     );
     await suppliers.addReview(org.owner, ref, { ...review, reviewedOn: '2026-02-01' });
     expect((await suppliers.get(org.id, ref)).attention).not.toContain(
-      'The last review raised concerns.',
+      'Last review raised concerns',
     );
   });
 });
@@ -230,7 +230,7 @@ describe('files', () => {
   it('count towards what is on file, and the trail keeps what was removed', async () => {
     const org = await organization();
     const { ref } = await suppliers.create(org.owner, input(org.owner.id));
-    expect((await suppliers.get(org.id, ref)).attention).toContain('No contract on file.');
+    expect((await suppliers.get(org.id, ref)).attention).toContain('No contract on file');
 
     await suppliers.addFile(org.owner, ref, file);
     const supplier = await suppliers.get(org.id, ref);

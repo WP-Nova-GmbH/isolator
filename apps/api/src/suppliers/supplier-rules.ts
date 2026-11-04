@@ -59,7 +59,10 @@ export function supplierState(
   return lastOutcome ? 'Reviewed' : 'Not reviewed';
 }
 
-/** What is missing or out of date on this Supplier, in the order to deal with it. */
+/**
+ * What is missing or out of date on this Supplier, in the order to deal with it.
+ * Short phrases, not sentences: the register lists several side by side on one line.
+ */
 export function supplierAttention(
   supplier: SupplierFacts,
   files: FileFacts[],
@@ -70,42 +73,44 @@ export function supplierAttention(
   const notExpired = files.filter((file) => fileState(file.expiresOn, today) !== 'Expired');
   const attention: string[] = [];
 
-  if (lastOutcome === 'stop_using') attention.push('The last review says to stop using them.');
-  if (lastOutcome === 'concerns') attention.push('The last review raised concerns.');
+  if (lastOutcome === 'stop_using') attention.push('Last review says stop using them');
+  if (lastOutcome === 'concerns') attention.push('Last review raised concerns');
   if (supplier.nextReviewOn < today) {
-    attention.push(`The review was due on ${supplier.nextReviewOn}.`);
+    attention.push(`Review overdue since ${supplier.nextReviewOn}`);
   }
+  // Only asked for when they handle personal data.
   if (
     supplier.handlesPersonalData &&
     !notExpired.some((file) => file.kind === 'data_processing_agreement')
   ) {
-    attention.push('They handle personal data, but no data processing agreement is on file.');
+    attention.push('No data processing agreement');
   }
   if (!notExpired.some((file) => file.kind === 'contract')) {
-    attention.push('No contract on file.');
+    attention.push('No contract on file');
   }
   // What nobody has found out yet.
-  if (!supplier.ownerId) attention.push('Nobody owns this Supplier.');
-  if (!supplier.criticality) attention.push('Their criticality is unknown.');
+  if (!supplier.ownerId) attention.push('No owner');
+  if (!supplier.criticality) attention.push('Criticality unknown');
   if (supplier.handlesPersonalData === null) {
-    attention.push('Whether they handle personal data is unknown.');
+    attention.push('Unknown if they handle personal data');
   }
-  if (!supplier.contractTerm) attention.push('The contract term is unknown.');
+  if (!supplier.contractTerm) attention.push('Contract term unknown');
   if (supplier.contractEnds && supplier.contractEnds < today) {
-    attention.push(`The contract ended on ${supplier.contractEnds}.`);
+    attention.push(`Contract ended on ${supplier.contractEnds}`);
   } else if (
     supplier.contractEnds &&
     supplier.contractEnds <= addDays(today, CONTRACT_END_WARNING_DAYS)
   ) {
-    attention.push(`The contract ends on ${supplier.contractEnds}.`);
+    attention.push(`Contract ends on ${supplier.contractEnds}`);
   }
+  // Only asked for when they are critical.
   if (supplier.criticality === 'high' && !supplier.exitPlan) {
-    attention.push('They are critical, but there is no exit plan.');
+    attention.push('No exit plan');
   }
   for (const file of files) {
     const state = fileState(file.expiresOn, today);
-    if (state === 'Expired') attention.push(`${file.title} expired on ${file.expiresOn}.`);
-    if (state === 'Expires soon') attention.push(`${file.title} expires on ${file.expiresOn}.`);
+    if (state === 'Expired') attention.push(`${file.title} expired on ${file.expiresOn}`);
+    if (state === 'Expires soon') attention.push(`${file.title} expires on ${file.expiresOn}`);
   }
   return attention;
 }
