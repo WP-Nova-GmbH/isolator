@@ -11,11 +11,9 @@ import {
   type AssetDetail,
 } from '@/lib/assets';
 import { useAppData } from '@/lib/members';
-import type { Supplier } from '@/lib/suppliers';
 
 interface AssetFieldsProps {
   asset?: AssetDetail;
-  suppliers: Supplier[];
 }
 
 function Options({ labels }: { labels: Record<string, string> }) {
@@ -27,7 +25,7 @@ function Options({ labels }: { labels: Record<string, string> }) {
 }
 
 /** The fields of an asset. Goes inside a form; assetPayload reads them back out. */
-export function AssetFields({ asset, suppliers }: AssetFieldsProps) {
+export function AssetFields({ asset }: AssetFieldsProps) {
   const { me } = useAppData();
 
   return (
@@ -72,20 +70,6 @@ export function AssetFields({ asset, suppliers }: AssetFieldsProps) {
               defaultValue={asset?.technicalOwnerId ?? null}
               unassigned
             />
-          </Field>
-          <Field label="Supplier that provides it" htmlFor="supplierRef">
-            <NativeSelect
-              id="supplierRef"
-              name="supplierRef"
-              defaultValue={asset?.supplier?.ref ?? ''}
-            >
-              <option value="">None</option>
-              {suppliers.map((supplier) => (
-                <option key={supplier.ref} value={supplier.ref}>
-                  {supplier.name}
-                </option>
-              ))}
-            </NativeSelect>
           </Field>
         </FieldGrid>
         <Field label="Locations: offices, data centres, cloud regions" htmlFor="location">

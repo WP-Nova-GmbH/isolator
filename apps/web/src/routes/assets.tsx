@@ -42,7 +42,7 @@ export function Assets() {
     <>
       <PageHeader
         title="Assets"
-        description={`What ${me.organizationName} needs to protect, who owns it, and which Supplier provides it.`}
+        description={`What ${me.organizationName} needs to protect, who owns it, and which Suppliers it depends on.`}
         actions={
           canEdit && (
             <Button asChild>
@@ -58,7 +58,7 @@ export function Assets() {
             <TableHead>Type</TableHead>
             <TableHead>Classification</TableHead>
             <TableHead>Business owner</TableHead>
-            <TableHead>Supplier</TableHead>
+            <TableHead>Suppliers</TableHead>
             <TableHead>Open risks</TableHead>
           </TableRow>
         </TableHeader>
@@ -80,11 +80,16 @@ export function Assets() {
               ) : (
                 <DataCell>{UNASSIGNED}</DataCell>
               )}
-              {asset.supplier ? (
+              {asset.suppliers.length > 0 ? (
                 <TableCell>
-                  <RecordLink to={`/suppliers/${asset.supplier.ref}`} className="font-normal">
-                    {asset.supplier.name}
-                  </RecordLink>
+                  {asset.suppliers.map((supplier, index) => (
+                    <span key={supplier.ref}>
+                      {index > 0 && ', '}
+                      <RecordLink to={`/suppliers/${supplier.ref}`} className="font-normal">
+                        {supplier.name}
+                      </RecordLink>
+                    </span>
+                  ))}
                 </TableCell>
               ) : (
                 <DataCell>None</DataCell>

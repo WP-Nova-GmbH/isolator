@@ -14,7 +14,7 @@ import {
   InviteError,
 } from './routes/accept-invite';
 import { AssetDetail, assetDetailAction, assetDetailLoader } from './routes/asset-detail';
-import { AssetNew, assetNewAction, assetNewLoader } from './routes/asset-new';
+import { AssetNew, assetNewAction } from './routes/asset-new';
 import { Assets, assetsLoader } from './routes/assets';
 import { AuditFile, auditFileLoader } from './routes/audit-file';
 import { AuditTrail, auditTrailLoader } from './routes/audit-trail';
@@ -117,7 +117,6 @@ const routes: RouteObject[] = [
           { path: 'assets', loader: assetsLoader, element: <Assets /> },
           {
             path: 'assets/new',
-            loader: assetNewLoader,
             action: assetNewAction,
             element: <AssetNew />,
           },

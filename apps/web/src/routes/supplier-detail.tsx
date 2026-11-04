@@ -372,7 +372,7 @@ export function SupplierDetail() {
         label="Link asset"
         intent="link-asset"
         options={assets
-          .filter((asset) => !asset.supplier)
+          .filter((asset) => !asset.suppliers.some((linked) => linked.ref === supplier.ref))
           .map((asset) => ({ id: asset.id, label: asset.name }))}
       />
     ),

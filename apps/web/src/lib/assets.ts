@@ -49,7 +49,8 @@ export interface Asset {
   notes: string;
   retiredAt: string | null;
   retiredReason: string | null;
-  supplier: { ref: string; name: string } | null;
+  /** Every Supplier it depends on, such as the cloud provider and the partner who runs it. */
+  suppliers: { ref: string; name: string }[];
   risks: number;
 }
 
@@ -69,7 +70,6 @@ export function assetPayload(form: FormData) {
     ownerId: form.get('ownerId') || null,
     technicalOwnerId: form.get('technicalOwnerId') || null,
     location: form.get('location'),
-    supplierRef: form.get('supplierRef') || null,
     validation: form.get('validation'),
     source: form.get('source'),
     notes: form.get('notes'),

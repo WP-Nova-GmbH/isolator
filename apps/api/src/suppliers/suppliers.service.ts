@@ -11,6 +11,7 @@ import { AuditTrailService, recordEvent } from '../audit/audit-trail';
 import { DB, type Database } from '../db/db.module';
 import { nextNumber } from '../db/next-number';
 import {
+  assetSuppliers,
   assets,
   members,
   riskAssets,
@@ -120,17 +121,10 @@ export class SuppliersService {
       this.db.select().from(supplierFiles).where(eq(supplierFiles.organizationId, organizationId)),
       this.reviews(organizationId),
       this.db
-        .select({ supplierId: assets.supplierId, total: count() })
-        .from(assets)
-        .where(
-          and(
-            eq(assets.organizationId, organizationId),
-            isNotNull(assets.supplierId),
-            isNull(assets.retiredAt),
-            isNull(assets.deletedAt),
-          ),
-        )
-        .groupBy(assets.supplierId),
+        .select({ supplierId: assetSuppliers.supplierId, total: count() })
+        .from(assetSuppliers)
+        .where(eq(assetSuppliers.organizationId, organizationId))
+        .groupBy(assetSuppliers.supplierId),
     ]);
     return rows.map((row) =>
       this.summary(
@@ -160,13 +154,12 @@ export class SuppliersService {
       this.reviews(organizationId, supplierId),
       this.db
         .select({ id: assets.id, name: assets.name })
-        .from(assets)
+        .from(assetSuppliers)
+        .innerJoin(assets, eq(assets.id, assetSuppliers.assetId))
         .where(
           and(
-            eq(assets.organizationId, organizationId),
-            eq(assets.supplierId, supplierId),
-            isNull(assets.retiredAt),
-            isNull(assets.deletedAt),
+            eq(assetSuppliers.organizationId, organizationId),
+            eq(assetSuppliers.supplierId, supplierId),
           ),
         )
         .orderBy(asc(assets.name)),
@@ -180,12 +173,12 @@ export class SuppliersService {
           residualImpact: risks.residualImpact,
         })
         .from(riskAssets)
-        .innerJoin(assets, eq(assets.id, riskAssets.assetId))
+        .innerJoin(assetSuppliers, eq(assetSuppliers.assetId, riskAssets.assetId))
         .innerJoin(risks, eq(risks.id, riskAssets.riskId))
         .where(
           and(
             eq(riskAssets.organizationId, organizationId),
-            eq(assets.supplierId, supplierId),
+            eq(assetSuppliers.supplierId, supplierId),
             isNull(risks.closedAt),
             isNull(risks.deletedAt),
           ),
@@ -419,7 +412,7 @@ export class SuppliersService {
   async linkAsset(member: CurrentMember, ref: string, assetId: string) {
     const row = await this.findActive(member.organizationId, ref);
     const [asset] = await this.db
-      .select({ name: assets.name, supplierId: assets.supplierId })
+      .select({ name: assets.name })
       .from(assets)
       .where(
         and(
@@ -430,13 +423,13 @@ export class SuppliersService {
         ),
       );
     if (!asset) throw new BadRequestException('Choose an asset from your register.');
-    if (asset.supplierId === row.supplier.id) return;
-    if (asset.supplierId) throw new ConflictException('Another Supplier provides this asset.');
     await this.db.transaction(async (tx) => {
-      await tx
-        .update(assets)
-        .set({ supplierId: row.supplier.id })
-        .where(and(eq(assets.organizationId, member.organizationId), eq(assets.id, assetId)));
+      const [linked] = await tx
+        .insert(assetSuppliers)
+        .values({ organizationId: member.organizationId, assetId, supplierId: row.supplier.id })
+        .onConflictDoNothing()
+        .returning();
+      if (!linked) return;
       await recordEvent(tx, member, {
         action: 'supplier.asset_linked',
         ...this.record(row.supplier),
@@ -448,18 +441,21 @@ export class SuppliersService {
   async unlinkAsset(member: CurrentMember, ref: string, assetId: string) {
     const row = await this.find(member.organizationId, ref);
     await this.db.transaction(async (tx) => {
-      const [asset] = await tx
-        .update(assets)
-        .set({ supplierId: null })
+      const [unlinked] = await tx
+        .delete(assetSuppliers)
         .where(
           and(
-            eq(assets.organizationId, member.organizationId),
-            eq(assets.id, assetId),
-            eq(assets.supplierId, row.supplier.id),
+            eq(assetSuppliers.organizationId, member.organizationId),
+            eq(assetSuppliers.assetId, assetId),
+            eq(assetSuppliers.supplierId, row.supplier.id),
           ),
         )
-        .returning({ name: assets.name });
-      if (!asset) return;
+        .returning();
+      if (!unlinked) return;
+      const [asset] = await tx
+        .select({ name: assets.name })
+        .from(assets)
+        .where(and(eq(assets.organizationId, member.organizationId), eq(assets.id, assetId)));
       await recordEvent(tx, member, {
         action: 'supplier.asset_unlinked',
         ...this.record(row.supplier),
@@ -597,8 +593,13 @@ export class SuppliersService {
   private async assertNoAssets(organizationId: string, supplierId: string) {
     const [{ linked }] = await this.db
       .select({ linked: count() })
-      .from(assets)
-      .where(and(eq(assets.organizationId, organizationId), eq(assets.supplierId, supplierId)));
+      .from(assetSuppliers)
+      .where(
+        and(
+          eq(assetSuppliers.organizationId, organizationId),
+          eq(assetSuppliers.supplierId, supplierId),
+        ),
+      );
     if (linked > 0) {
       throw new ConflictException(
         linked === 1

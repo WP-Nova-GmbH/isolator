@@ -13,9 +13,10 @@ import { EditDialog } from '@/components/form-dialog';
 import { FormError } from '@/components/form-error';
 import { HistoryList } from '@/components/history-list';
 import { LifecycleMenu, type LifecycleAction } from '@/components/lifecycle-menu';
+import { LinkedItem, LinkPicker } from '@/components/link-picker';
 import { UNASSIGNED, UNKNOWN } from '@/components/owner-select';
-import { PageHeader } from '@/components/page-header';
-import { RecordLink, Ref } from '@/components/table-parts';
+import { PageHeader, SectionHeader } from '@/components/page-header';
+import { Ref } from '@/components/table-parts';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
 import { api, attempt } from '@/lib/api';
@@ -55,6 +56,14 @@ export async function assetDetailAction({ request, params }: ActionFunctionArgs)
     switch (form.get('intent')) {
       case 'save':
         return api(path, { method: 'PUT', body: assetPayload(form) });
+      // The link belongs to both; the Supplier's history records it.
+      case 'link-supplier':
+        return api(`/suppliers/${form.get('id')}/assets`, {
+          method: 'POST',
+          body: { id: params.id },
+        });
+      case 'unlink-supplier':
+        return api(`/suppliers/${form.get('id')}/assets/${params.id}`, { method: 'DELETE' });
       case 'retire':
         return api(`${path}/retirement`, { method: 'POST', body: { reason } });
       case 'reinstate':
@@ -103,6 +112,7 @@ export function AssetDetail() {
   const retired = asset.retiredAt !== null;
   const { canEdit } = usePermissions();
   const locked = retired || !canEdit;
+  const linkedSuppliers = new Set(asset.suppliers.map((supplier) => supplier.ref));
 
   return (
     <>
@@ -113,7 +123,7 @@ export function AssetDetail() {
           <>
             {!locked && (
               <EditDialog title="Edit asset">
-                <AssetFields asset={asset} suppliers={suppliers} />
+                <AssetFields asset={asset} />
               </EditDialog>
             )}
             <LifecycleMenu {...lifecycleProps(asset)} />
@@ -151,13 +161,6 @@ export function AssetDetail() {
             <Fact label="Technical owner" empty={UNASSIGNED}>
               {asset.technicalOwnerName}
             </Fact>
-            <Fact label="Supplier that provides it" empty="None">
-              {asset.supplier && (
-                <RecordLink to={`/suppliers/${asset.supplier.ref}`} className="font-normal">
-                  {asset.supplier.name}
-                </RecordLink>
-              )}
-            </Fact>
             <Fact label="Locations: offices, data centres, cloud regions" wide>
               {asset.location}
             </Fact>
@@ -173,6 +176,40 @@ export function AssetDetail() {
               {asset.notes}
             </Fact>
           </Facts>
+        </section>
+
+        <section aria-label="Suppliers" className="flex flex-col gap-3">
+          <SectionHeader title="Suppliers">
+            {!retired && (
+              <LinkPicker
+                label="Link Supplier"
+                intent="link-supplier"
+                options={suppliers
+                  .filter((supplier) => !linkedSuppliers.has(supplier.ref))
+                  .map((supplier) => ({ id: supplier.ref, label: supplier.name }))}
+              />
+            )}
+          </SectionHeader>
+          {asset.suppliers.map((supplier) => (
+            <LinkedItem
+              key={supplier.ref}
+              id={supplier.ref}
+              intent="unlink-supplier"
+              label={supplier.name}
+              locked={retired}
+            >
+              <Ref>{supplier.ref}</Ref>
+              <Link to={`/suppliers/${supplier.ref}`} className="min-w-0 hover:underline">
+                {supplier.name}
+              </Link>
+            </LinkedItem>
+          ))}
+          {asset.suppliers.length === 0 && (
+            <p className="text-muted-foreground">
+              No Suppliers linked. Link every one it depends on, such as the provider and whoever
+              runs it for you.
+            </p>
+          )}
         </section>
 
         <section aria-label="Open risks" className="flex flex-col gap-3">
