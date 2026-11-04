@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { usePermissions } from '@/lib/members';
 import type { Task } from '@/lib/tasks';
 
 interface TasksTableProps {
@@ -114,6 +115,7 @@ export function TasksTable({
   canFinish = false,
   emptyText,
 }: TasksTableProps) {
+  const canFinish = open && usePermissions().canEdit;
   const columns = 4 + (showBelongsTo ? 1 : 0) + (canFinish ? 1 : 0);
 
   return (

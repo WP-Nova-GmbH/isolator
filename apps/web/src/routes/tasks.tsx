@@ -43,6 +43,7 @@ export async function tasksAction({ request }: ActionFunctionArgs) {
 }
 
 export function Tasks() {
+  const { canEdit } = usePermissions();
   const { tasks, risks, soa, suppliers, incidents, nonconformities } =
     useLoaderData<typeof tasksLoader>();
   const { me } = useAppData();
@@ -102,9 +103,11 @@ export function Tasks() {
         title="Tasks"
         description="All follow-up work from risks, controls, Suppliers, Incidents and Nonconformities."
         actions={
-          <Button type="button" onClick={() => setAdding(true)}>
-            New Task
-          </Button>
+          canEdit && (
+            <Button type="button" onClick={() => setAdding(true)}>
+              New Task
+            </Button>
+          )
         }
       />
       <FormError message={result?.error} />

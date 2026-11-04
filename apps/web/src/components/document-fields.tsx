@@ -1,9 +1,10 @@
 import { Field, FieldGrid } from '@/components/field';
+import { OwnerSelect } from '@/components/owner-select';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
-import { documentKindLabels, type DocumentDetail } from '@/lib/documents';
+import { documentKindGroups, documentKindLabels, type DocumentDetail } from '@/lib/documents';
 import { useAppData } from '@/lib/members';
 
 interface DocumentFieldsProps {
@@ -12,9 +13,22 @@ interface DocumentFieldsProps {
   contentLocked?: boolean;
 }
 
+/** Every Document kind, grouped. */
+export function DocumentKindOptions() {
+  return documentKindGroups.map((group) => (
+    <optgroup key={group.label} label={group.label}>
+      {group.kinds.map((kind) => (
+        <option key={kind} value={kind}>
+          {documentKindLabels[kind]}
+        </option>
+      ))}
+    </optgroup>
+  ));
+}
+
 /** The fields of a Document. Goes inside a form; documentPayload reads them back out. */
 export function DocumentFields({ document, contentLocked = false }: DocumentFieldsProps) {
-  const { me, members } = useAppData();
+  const { me } = useAppData();
 
   return (
     <Card aria-label="Document content" className="flex flex-col gap-4">
@@ -24,23 +38,26 @@ export function DocumentFields({ document, contentLocked = false }: DocumentFiel
       <FieldGrid>
         <Field label="Kind" htmlFor="kind">
           <NativeSelect id="kind" name="kind" defaultValue={document?.kind ?? 'policy'}>
-            {Object.entries(documentKindLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
+            <DocumentKindOptions />
           </NativeSelect>
         </Field>
         <Field label="Owner" htmlFor="ownerId">
-          <NativeSelect id="ownerId" name="ownerId" defaultValue={document?.ownerId ?? me.id}>
-            {members.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.name}
-              </option>
-            ))}
-          </NativeSelect>
+          <OwnerSelect id="ownerId" name="ownerId" defaultValue={document?.ownerId ?? me.id} />
+        </Field>
+        <Field label="Source date, if known" htmlFor="datedOn">
+          <Input
+            id="datedOn"
+            name="datedOn"
+            type="date"
+            className="read-only:bg-surface-sunken"
+            defaultValue={document?.datedOn ?? ''}
+            readOnly={contentLocked}
+          />
         </Field>
       </FieldGrid>
+      <p className="-mt-2 text-xs text-muted-foreground">
+        The date on the document itself. When it was added here is kept separately.
+      </p>
       <Field label="Content" htmlFor="content">
         <Textarea
           id="content"

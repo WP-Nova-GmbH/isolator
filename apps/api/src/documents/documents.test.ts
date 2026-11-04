@@ -37,7 +37,14 @@ async function organization() {
 }
 
 function input(ownerId: string, overrides: Partial<DocumentInput> = {}): DocumentInput {
-  return { title: 'Access policy', kind: 'policy', ownerId, content: 'Rules', ...overrides };
+  return {
+    title: 'Access policy',
+    kind: 'policy',
+    ownerId,
+    content: 'Rules',
+    datedOn: null,
+    ...overrides,
+  };
 }
 
 const upload = (content = 'hello') => ({
@@ -112,6 +119,46 @@ describe('confirming a version', () => {
       ownerName: 'Colleague',
       state: 'Confirmed',
     });
+  });
+});
+
+describe('source dates', () => {
+  it('are kept apart from when the version was added, and may be unknown', async () => {
+    const org = await organization();
+    const { id } = await documents.create(
+      org.owner,
+      input(org.owner.id, { kind: 'risk_methodology', datedOn: '2024-03-01' }),
+    );
+    const document = await documents.get(org.id, id);
+    expect(document).toMatchObject({ kind: 'risk_methodology', datedOn: '2024-03-01' });
+    expect(document.versions[0].datedOn).toBe('2024-03-01');
+    expect(document.versions[0].createdAt.toISOString().slice(0, 10)).not.toBe('2024-03-01');
+
+    await documents.update(org.owner, id, input(org.owner.id, { datedOn: null }));
+    expect(await documents.get(org.id, id)).toMatchObject({ datedOn: null });
+    expect((await documents.get(org.id, id)).history[0]).toMatchObject({
+      before: { datedOn: '2024-03-01' },
+      after: { datedOn: null },
+    });
+  });
+
+  it('stay as confirmed, and a new version starts without one', async () => {
+    const org = await organization();
+    const { id } = await documents.create(
+      org.owner,
+      input(org.owner.id, { kind: 'inventory', datedOn: '2025-06-30' }),
+    );
+    await documents.confirm(org.owner, id);
+    await expect(
+      documents.update(org.owner, id, input(org.owner.id, { datedOn: '2025-07-01' })),
+    ).rejects.toThrow('Start a new version to change its date.');
+
+    await documents.startVersion(org.owner, id);
+    expect(await documents.get(org.id, id)).toMatchObject({ version: 2, datedOn: null });
+    expect((await documents.get(org.id, id)).versions.map((v) => v.datedOn)).toEqual([
+      null,
+      '2025-06-30',
+    ]);
   });
 });
 

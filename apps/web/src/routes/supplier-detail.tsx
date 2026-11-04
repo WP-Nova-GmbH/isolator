@@ -54,7 +54,7 @@ import {
   type SupplierDetail as Supplier,
   type SupplierFile,
 } from '@/lib/suppliers';
-import { addTask, cancelTask, finishTask } from '@/lib/tasks';
+import { taskIntent } from '@/lib/tasks';
 import { useFormFetcher } from '@/lib/use-form-fetcher';
 
 export async function supplierDetailLoader({ params }: LoaderFunctionArgs) {
@@ -399,7 +399,7 @@ export function SupplierDetail() {
                 <TableHead>Dated</TableHead>
                 <TableHead>Expires</TableHead>
                 <TableHead>State</TableHead>
-                {!ended && <TableHead className="sr-only">Actions</TableHead>}
+                {!locked && <TableHead className="sr-only">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -419,7 +419,7 @@ export function SupplierDetail() {
                   <TableCell>
                     <StateBadge kind="evidence" state={file.state} />
                   </TableCell>
-                  {!ended && (
+                  {!locked && (
                     <TableCell className="py-0">
                       <RemoveFile file={file} />
                     </TableCell>
@@ -433,7 +433,7 @@ export function SupplierDetail() {
 
         <section className="flex flex-col gap-3">
           <SectionHeader title="Reviews">
-            {!ended && (
+            {!locked && (
               <Button type="button" variant="outline" onClick={() => setAdding('review')}>
                 Record review
               </Button>
@@ -470,7 +470,7 @@ export function SupplierDetail() {
 
         <section className="flex flex-col gap-3">
           <SectionHeader title="Tasks">
-            {!ended && (
+            {!locked && (
               <Button type="button" variant="outline" onClick={() => setAdding('task')}>
                 New Task
               </Button>

@@ -34,6 +34,7 @@ function AssetNote({ asset }: { asset: Asset }) {
 }
 
 export function Assets() {
+  const { canEdit } = usePermissions();
   const { assets, retired } = useLoaderData<typeof assetsLoader>();
   const { me } = useAppData();
 

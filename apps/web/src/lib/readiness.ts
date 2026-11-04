@@ -105,6 +105,7 @@ export function readinessGroups(data: ReadinessData): ReadinessGroup[] {
           where: { label: 'Risks', to: '/risks/criteria' },
           state: criteria.saved ? 'Done' : 'Missing',
         },
+        documentItem(documents, '6.1.2', 'Risk assessment methodology', 'risk_methodology'),
         {
           ref: '6.1.2',
           title: 'First Risk assessment',

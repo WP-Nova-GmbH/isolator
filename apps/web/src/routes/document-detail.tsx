@@ -125,10 +125,14 @@ function lifecycleProps(doc: IsmsDocument) {
 
 function versionItems(doc: IsmsDocument) {
   return doc.versions.map((version) => ({
-    title: `Version ${version.version}`,
-    meta: version.confirmedAt
-      ? `Confirmed by ${version.confirmedBy}, ${version.confirmedAt.slice(0, 10)}`
-      : `Draft by ${version.createdBy}, ${version.createdAt.slice(0, 10)}`,
+    title: `Version ${version.version}, ${version.datedOn ? `dated ${version.datedOn}` : 'date unknown'}`,
+    meta: [
+      `Added by ${version.createdBy}, ${version.createdAt.slice(0, 10)}`,
+      version.confirmedAt &&
+        `Confirmed by ${version.confirmedBy}, ${version.confirmedAt.slice(0, 10)}`,
+    ]
+      .filter(Boolean)
+      .join('. '),
   }));
 }
 

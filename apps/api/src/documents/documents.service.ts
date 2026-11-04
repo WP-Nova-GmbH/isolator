@@ -37,9 +37,17 @@ export const documentInput = z.object({
     'awareness',
     'internal_audit',
     'management_review',
+    'procedure',
+    'risk_methodology',
+    'assessment',
+    'inventory',
+    'reference',
+    'other',
   ]),
   ownerId: z.uuid('Choose an owner.'),
   content: z.string(),
+  // The date the current version carries. Null when nobody knows it.
+  datedOn: z.iso.date().nullable(),
 });
 
 export const documentFileInput = z.object({ storedFileId: z.uuid().nullable() });
@@ -122,6 +130,7 @@ export class DocumentsService {
       },
       versions: versions.map(({ version, createdBy, confirmedBy, file }) => ({
         version: version.version,
+        datedOn: version.datedOn,
         createdBy,
         createdAt: version.createdAt,
         confirmedBy,
@@ -157,12 +166,20 @@ export class DocumentsService {
         documentId: document.id,
         version: 1,
         content: input.content,
+        datedOn: input.datedOn,
         createdById: member.id,
       });
       await recordEvent(tx, member, {
         action: 'document.added',
         ...this.record(document),
-        after: { title: input.title, kind: input.kind, ownerName, version: 1, content: input.content },
+        after: {
+          title: input.title,
+          kind: input.kind,
+          ownerName,
+          version: 1,
+          content: input.content,
+          datedOn: input.datedOn,
+        },
       });
       return { id: document.id };
     });
@@ -177,23 +194,33 @@ export class DocumentsService {
     if (latest.confirmedAt && input.content !== latest.content) {
       throw new ConflictException('Start a new version to change the content.');
     }
+    if (latest.confirmedAt && input.datedOn !== latest.datedOn) {
+      throw new ConflictException('Start a new version to change its date.');
+    }
     const before = {
       title: row.document.title,
       kind: row.document.kind,
       ownerName: row.ownerName,
       content: latest.content,
+      datedOn: latest.datedOn,
     };
-    const after = { title: input.title, kind: input.kind, ownerName, content: input.content };
+    const after = {
+      title: input.title,
+      kind: input.kind,
+      ownerName,
+      content: input.content,
+      datedOn: input.datedOn,
+    };
     if (JSON.stringify(before) === JSON.stringify(after)) return { id };
     await this.db.transaction(async (tx) => {
       await tx
         .update(documents)
         .set({ title: input.title, kind: input.kind, ownerId: input.ownerId })
         .where(this.scoped(organizationId, id));
-      if (input.content !== latest.content) {
+      if (input.content !== latest.content || input.datedOn !== latest.datedOn) {
         await tx
           .update(documentVersions)
-          .set({ content: input.content })
+          .set({ content: input.content, datedOn: input.datedOn })
           .where(this.scopedVersion(organizationId, latest.id));
       }
       await recordEvent(tx, member, {
@@ -428,6 +455,8 @@ export class DocumentsService {
       ownerName,
       version: latest.version,
       versionInForce: inForce?.version ?? null,
+      // The date the latest version carries, as `version` is the latest version.
+      datedOn: latest.datedOn,
       lastConfirmedAt: inForce?.confirmedAt ?? null,
       withdrawnAt: document.withdrawnAt,
       withdrawnReason: document.withdrawnReason,

@@ -12,7 +12,13 @@ export type DocumentKind =
   | 'competence'
   | 'awareness'
   | 'internal_audit'
-  | 'management_review';
+  | 'management_review'
+  | 'procedure'
+  | 'risk_methodology'
+  | 'assessment'
+  | 'inventory'
+  | 'reference'
+  | 'other';
 
 export const documentKindLabels: Record<DocumentKind, string> = {
   scope: 'Scope',
@@ -25,7 +31,34 @@ export const documentKindLabels: Record<DocumentKind, string> = {
   awareness: 'Awareness',
   internal_audit: 'Internal audit',
   management_review: 'Management review',
+  procedure: 'Procedure',
+  risk_methodology: 'Risk methodology',
+  assessment: 'Assessment',
+  inventory: 'Inventory',
+  reference: 'Reference material',
+  other: 'Other',
 };
+
+/** The kinds in the groups a picker shows them in. */
+export const documentKindGroups: { label: string; kinds: DocumentKind[] }[] = [
+  {
+    label: 'ISMS',
+    kinds: [
+      'scope',
+      'interested_parties',
+      'legal_requirements',
+      'roles',
+      'objectives',
+      'risk_methodology',
+      'competence',
+      'awareness',
+      'internal_audit',
+      'management_review',
+    ],
+  },
+  { label: 'Rules', kinds: ['policy', 'procedure'] },
+  { label: 'Records and material', kinds: ['assessment', 'inventory', 'reference', 'other'] },
+];
 
 export interface IsmsDocument {
   id: string;
@@ -35,6 +68,8 @@ export interface IsmsDocument {
   ownerName: string;
   version: number;
   versionInForce: number | null;
+  /** The date the latest version itself carries. Null when nobody knows it. */
+  datedOn: string | null;
   lastConfirmedAt: string | null;
   withdrawnAt: string | null;
   withdrawnReason: string | null;
@@ -43,6 +78,7 @@ export interface IsmsDocument {
 
 export interface DocumentVersion {
   version: number;
+  datedOn: string | null;
   createdBy: string;
   createdAt: string;
   confirmedBy: string | null;
@@ -66,5 +102,6 @@ export function documentPayload(form: FormData) {
     kind: form.get('kind'),
     ownerId: form.get('ownerId'),
     content: form.get('content'),
+    datedOn: form.get('datedOn') || null,
   };
 }

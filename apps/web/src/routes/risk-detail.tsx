@@ -118,7 +118,14 @@ function lifecycleProps(risk: Risk, isOwner: boolean) {
         ? 'Reopen this risk if it applies again. It will need a new Confirmation.'
         : `Only ${risk.ownerName}, the risk owner, can reopen this risk.`,
       actions: isOwner
-        ? [{ intent: 'reopen', label: 'Reopen risk', prompt: 'Why does this risk apply again?' }]
+        ? [
+            {
+              intent: 'reopen',
+              label: 'Reopen risk',
+              prompt: 'Why does this risk apply again?',
+              reviewers: true,
+            },
+          ]
         : [],
     };
   }

@@ -62,6 +62,7 @@ interface EvidenceTableProps {
 
 /** Posts intent=remove-evidence to the page's action. */
 export function EvidenceTable({ items, showControl = false }: EvidenceTableProps) {
+  const { canEdit } = usePermissions();
   return (
     <Table>
       <TableHeader>

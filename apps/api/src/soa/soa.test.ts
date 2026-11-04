@@ -193,6 +193,7 @@ describe('Evidence', () => {
       kind: 'policy',
       ownerId: org.owner.id,
       content: 'Rules',
+      datedOn: null,
     });
     await proof.add(org.owner, 'A.5.15', { ...item, title: null, location: null, documentId: id });
     const [listed] = await proof.list(org.id);

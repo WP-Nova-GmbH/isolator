@@ -169,6 +169,13 @@
       "when": 1793821482980,
       "tag": "0023_proposed_tasks",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793821641694,
+      "tag": "0024_document_kinds_and_source_dates",
+      "breakpoints": true
     }
   ]
 }

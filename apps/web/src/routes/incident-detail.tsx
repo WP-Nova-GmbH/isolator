@@ -98,6 +98,8 @@ export function IncidentDetail() {
   const navigation = useNavigation();
   const [addingTask, setAddingTask] = useState(false);
   const closed = incident.closedAt !== null;
+  const { canEdit } = usePermissions();
+  const locked = closed || !canEdit;
 
   return (
     <>
@@ -129,7 +131,7 @@ export function IncidentDetail() {
         }
       >
         <Form method="post" className="flex flex-col gap-6">
-          <fieldset disabled={closed} className="contents">
+          <fieldset disabled={locked} className="contents">
             <IncidentFields key={incident.ref} incident={incident} risks={risks} />
           </fieldset>
           {!closed && (

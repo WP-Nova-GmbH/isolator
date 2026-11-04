@@ -393,8 +393,10 @@ export function describeEvent({ action, recordLabel, before, after }: AuditEvent
         : 'Invited to the Organization';
     case 'member.invitation_revoked':
       return 'Invitation revoked';
-    case 'member.joined':
-      return `Joined the Organization, invited by ${String(after!.invitedBy)}`;
+    case 'member.joined': {
+      const role = after!.role ? ` as ${roleLabels[after!.role as Role]}` : '';
+      return `Joined the Organization${role}, invited by ${String(after!.invitedBy)}`;
+    }
     case 'member.removed':
       return 'Removed from the Organization';
     case 'member.role_changed':

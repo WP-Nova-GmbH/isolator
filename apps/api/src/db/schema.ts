@@ -213,6 +213,12 @@ export const documentKind = pgEnum('document_kind', [
   'awareness',
   'internal_audit',
   'management_review',
+  'procedure',
+  'risk_methodology',
+  'assessment',
+  'inventory',
+  'reference',
+  'other',
 ]);
 
 // A record the Organization maintains in its audit file. What it says lives in its versions.
@@ -253,6 +259,9 @@ export const documentVersions = pgTable(
     version: integer('version').notNull(),
     content: text('content').notNull().default(''),
     storedFileId: uuid('stored_file_id'),
+    // The date the version itself carries, which can be long before it was added here. Null when
+    // nobody knows it. When it was added is createdAt.
+    datedOn: date('dated_on'),
     createdById: uuid('created_by_id').notNull(),
     confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
     confirmedById: uuid('confirmed_by_id'),

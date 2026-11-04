@@ -58,8 +58,9 @@ export async function soaEntryAction({ request, params }: ActionFunctionArgs) {
       case 'save':
         return api(path, { method: 'PUT', body: soaEntryPayload(form) });
       case 'confirm':
-        // Saves first, so what is on screen is what gets confirmed.
-        await api(path, { method: 'PUT', body: soaEntryPayload(form) });
+        // Saves first, so what is on screen is what gets confirmed. A Reviewer's form is locked
+        // and sends no fields, so there is nothing to save.
+        if (form.has('status')) await api(path, { method: 'PUT', body: soaEntryPayload(form) });
         return api(`${path}/confirmations`, { method: 'POST' });
       case 'add-evidence':
         return addEvidence(form, params.ref!);
@@ -137,18 +138,44 @@ export function SoaEntry() {
         }
       >
         <Form id="soa-form" method="post" className="flex flex-col gap-6">
-          <Card aria-label="Decision" className="flex flex-col gap-4">
-            <h2>Decision</h2>
-            <FieldGrid>
-              <Field label="Applies" htmlFor="applicable">
-                <NativeSelect
-                  id="applicable"
-                  name="applicable"
-                  defaultValue={entry.applicable ? 'yes' : 'no'}
-                >
-                  <option value="yes">Yes</option>
-                  <option value="no">No</option>
-                </NativeSelect>
+          <fieldset disabled={!canEdit} className="contents">
+            <Card aria-label="Decision" className="flex flex-col gap-4">
+              <h2>Decision</h2>
+              <FieldGrid>
+                <Field label="Applies" htmlFor="applicable">
+                  <NativeSelect
+                    id="applicable"
+                    name="applicable"
+                    defaultValue={entry.applicable ? 'yes' : 'no'}
+                  >
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                  </NativeSelect>
+                </Field>
+                <Field label="Implementation status" htmlFor="status">
+                  <NativeSelect id="status" name="status" defaultValue={entry.status}>
+                    {Object.entries(statusLabels).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </Field>
+                <Field label="Owner" htmlFor="ownerId">
+                  <OwnerSelect
+                    id="ownerId"
+                    name="ownerId"
+                    defaultValue={entry.ownerId}
+                    unassigned
+                  />
+                </Field>
+              </FieldGrid>
+              <Field label="Justification" htmlFor="justification">
+                <Textarea
+                  id="justification"
+                  name="justification"
+                  defaultValue={entry.justification}
+                />
               </Field>
               <Field label="Implementation status" htmlFor="status">
                 <NativeSelect id="status" name="status" defaultValue={entry.status}>

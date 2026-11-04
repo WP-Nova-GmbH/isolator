@@ -101,6 +101,8 @@ export function NonconformityDetail() {
   const navigation = useNavigation();
   const [addingTask, setAddingTask] = useState(false);
   const closed = nonconformity.closedAt !== null;
+  const { canEdit } = usePermissions();
+  const locked = closed || !canEdit;
 
   return (
     <>
@@ -132,7 +134,7 @@ export function NonconformityDetail() {
         }
       >
         <Form method="post" className="flex flex-col gap-6">
-          <fieldset disabled={closed} className="contents">
+          <fieldset disabled={locked} className="contents">
             <NonconformityFields key={nonconformity.ref} nonconformity={nonconformity} />
           </fieldset>
           {!closed && (
