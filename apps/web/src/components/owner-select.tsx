@@ -12,6 +12,8 @@ interface OwnerSelectProps {
   /** Offers "Unassigned", which posts an empty value. */
   unassigned?: boolean;
   required?: boolean;
+  className?: string;
+  'aria-label'?: string;
 }
 
 /** Chooses one of the Organization's Members. */

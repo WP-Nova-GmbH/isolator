@@ -27,7 +27,7 @@ import { Card } from '@/components/ui/card';
 import { api, attempt } from '@/lib/api';
 import { historyItems } from '@/lib/audit';
 import { useAppData } from '@/lib/members';
-import { addTask, cancelTask, finishTask } from '@/lib/tasks';
+import { taskIntent } from '@/lib/tasks';
 import {
   riskPayload,
   toTask,
@@ -84,12 +84,8 @@ export async function riskDetailAction({ request, params }: ActionFunctionArgs) 
         return api(`${path}/controls`, { method: 'POST', body: { id } });
       case 'unlink-control':
         return api(`${path}/controls/${id}`, { method: 'DELETE' });
-      case 'add-task':
-        return addTask(form, { riskRef: params.ref });
-      case 'finish-task':
-        return finishTask(form);
-      case 'cancel-task':
-        return cancelTask(form);
+      default:
+        return taskIntent(form, { riskRef: params.ref });
     }
   });
 }

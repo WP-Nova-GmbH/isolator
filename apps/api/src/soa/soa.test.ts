@@ -280,6 +280,7 @@ describe('tenancy', () => {
       kind: 'policy',
       ownerId: b.owner.id,
       content: 'x',
+      datedOn: null,
     });
     await expect(
       proof.add(a.owner, 'A.5.15', { ...item, storedFileId: stored.id }),

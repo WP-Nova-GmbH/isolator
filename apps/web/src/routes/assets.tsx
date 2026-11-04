@@ -13,7 +13,7 @@ import {
 import { UNASSIGNED, UNKNOWN } from '@/components/owner-select';
 import { api } from '@/lib/api';
 import { assetTypeLabels, classificationLabels, type Asset } from '@/lib/assets';
-import { useAppData } from '@/lib/members';
+import { useAppData, usePermissions } from '@/lib/members';
 
 export async function assetsLoader() {
   const [assets, retired] = await Promise.all([
@@ -43,9 +43,11 @@ export function Assets() {
         title="Assets"
         description={`What ${me.organizationName} needs to protect, who owns it, and which Supplier provides it.`}
         actions={
-          <Button asChild>
-            <Link to="/assets/new">Add asset</Link>
-          </Button>
+          canEdit && (
+            <Button asChild>
+              <Link to="/assets/new">Add asset</Link>
+            </Button>
+          )
         }
       />
       <Table>

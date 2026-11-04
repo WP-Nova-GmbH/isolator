@@ -13,11 +13,12 @@ import type { Nonconformity } from '@/lib/nonconformities';
 import { toTask, type ApiTask, type Risk } from '@/lib/risks';
 import type { SoaEntry } from '@/lib/soa';
 import type { Supplier } from '@/lib/suppliers';
-import { addTask, cancelTask, finishTask } from '@/lib/tasks';
+import { taskIntent } from '@/lib/tasks';
 
 const tabs = [
   { value: 'all', label: 'All' },
   { value: 'mine', label: 'Mine' },
+  { value: 'proposed', label: 'Proposed' },
   { value: 'overdue', label: 'Overdue' },
   { value: 'done', label: 'Done' },
   { value: 'cancelled', label: 'Cancelled' },
@@ -37,18 +38,8 @@ export async function tasksLoader() {
 
 export async function tasksAction({ request }: ActionFunctionArgs) {
   const form = await request.formData();
-  return attempt(async () => {
-    switch (form.get('intent')) {
-      case 'finish-task':
-        return finishTask(form);
-      case 'cancel-task':
-        return cancelTask(form);
-      case 'add-task': {
-        const [field, ref] = String(form.get('target')).split(':');
-        return addTask(form, { [field]: ref });
-      }
-    }
-  });
+  const [field, ref] = String(form.get('target')).split(':');
+  return attempt(async () => taskIntent(form, { [field]: ref }));
 }
 
 export function Tasks() {
@@ -61,6 +52,7 @@ export function Tasks() {
 
   const filters: Record<string, (task: ApiTask) => boolean> = {
     mine: (task) => task.ownerId === me.id,
+    proposed: (task) => task.state === 'Proposed',
     overdue: (task) => task.state === 'Overdue',
     done: (task) => task.state === 'Done',
     cancelled: (task) => task.state === 'Cancelled',

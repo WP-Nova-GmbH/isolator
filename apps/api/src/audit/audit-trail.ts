@@ -77,6 +77,7 @@ export type AuditAction =
   | 'member.removed'
   | 'organization.renamed'
   | 'task.added'
+  | 'task.committed'
   | 'task.finished'
   | 'task.cancelled';
 

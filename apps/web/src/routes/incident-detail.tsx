@@ -25,7 +25,7 @@ import { api, attempt } from '@/lib/api';
 import { historyItems } from '@/lib/audit';
 import { incidentPayload, type IncidentDetail as Incident } from '@/lib/incidents';
 import { toTask, type ApiTask, type Risk } from '@/lib/risks';
-import { addTask, cancelTask, finishTask } from '@/lib/tasks';
+import { taskIntent } from '@/lib/tasks';
 
 export async function incidentDetailLoader({ params }: LoaderFunctionArgs) {
   const [incident, tasks, risks] = await Promise.all([
@@ -56,12 +56,8 @@ export async function incidentDetailAction({ request, params }: ActionFunctionAr
         return api(`${path}/closure`, { method: 'POST', body: { reason } });
       case 'reopen':
         return api(`${path}/reopening`, { method: 'POST', body: { reason } });
-      case 'add-task':
-        return addTask(form, { incidentRef: params.ref });
-      case 'finish-task':
-        return finishTask(form);
-      case 'cancel-task':
-        return cancelTask(form);
+      default:
+        return taskIntent(form, { incidentRef: params.ref });
     }
   });
 }

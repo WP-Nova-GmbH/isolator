@@ -1,3 +1,4 @@
+import { UNASSIGNED } from '@/components/owner-select';
 import type { State } from '@/components/state-badge';
 import type { AuditEvent } from '@/lib/audit';
 import type { Task } from '@/lib/tasks';
@@ -80,9 +81,10 @@ export interface CompletedRiskAssessment {
 export interface ApiTask {
   id: string;
   title: string;
-  ownerId: string;
-  ownerName: string;
-  dueOn: string;
+  /** Null while a proposed Task has nobody agreed for it, and the same for its due date. */
+  ownerId: string | null;
+  ownerName: string | null;
+  dueOn: string | null;
   state: State<'task'>;
   cancelledReason: string | null;
   belongsTo: {
@@ -105,8 +107,10 @@ export function toTask(task: ApiTask): Task {
   return {
     id: task.id,
     title: task.title,
-    owner: task.ownerName,
-    due: task.dueOn,
+    ownerId: task.ownerId,
+    owner: task.ownerName ?? UNASSIGNED,
+    dueOn: task.dueOn,
+    due: task.dueOn ?? 'Not set',
     state: task.state,
     cancelledReason: task.cancelledReason,
     belongsTo: belongsTo && {

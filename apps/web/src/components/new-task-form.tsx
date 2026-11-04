@@ -1,4 +1,5 @@
 import { Field, FieldGrid } from '@/components/field';
+import { OwnerSelect } from '@/components/owner-select';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,10 +14,14 @@ interface NewTaskFormProps {
   onClose: () => void;
 }
 
-/** Posts intent=add-task to the page's action. */
+/**
+ * Posts intent=add-task to the page's action, or intent=propose-task for a Task nobody has agreed
+ * to yet, which may leave its owner and due date open.
+ */
 export function NewTaskForm({ targets, onClose }: NewTaskFormProps) {
-  const { me, members } = useAppData();
+  const { me } = useAppData();
   const fetcher = useFormFetcher(onClose);
+  const saving = fetcher.state !== 'idle';
 
   return (
     <Card aria-label="New Task">
@@ -42,26 +47,34 @@ export function NewTaskForm({ targets, onClose }: NewTaskFormProps) {
             </Field>
           )}
           <Field label="Owner" htmlFor="task-owner">
-            <NativeSelect id="task-owner" name="ownerId" defaultValue={me.id}>
-              {members.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.name}
-                </option>
-              ))}
-            </NativeSelect>
+            <OwnerSelect
+              id="task-owner"
+              name="ownerId"
+              defaultValue={me.id}
+              unassigned
+              required
+            />
           </Field>
           <Field label="Due" htmlFor="task-due">
             <Input id="task-due" name="dueOn" type="date" required />
           </Field>
         </FieldGrid>
-        <div className="flex items-center gap-2">
+        <p className="text-xs text-muted-foreground">
+          Not agreed yet? Propose it. The owner and due date can wait until someone commits to it.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="submit" name="intent" value="add-task" disabled={saving}>
+            Add Task
+          </Button>
           <Button
             type="submit"
             name="intent"
-            value="add-task"
-            disabled={fetcher.state !== 'idle'}
+            value="propose-task"
+            variant="outline"
+            formNoValidate
+            disabled={saving}
           >
-            Add Task
+            Propose Task
           </Button>
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel

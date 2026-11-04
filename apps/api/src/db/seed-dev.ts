@@ -416,7 +416,12 @@ async function main() {
             .returning();
       const [member] = await tx
         .insert(members)
-        .values({ organizationId, userId: user.id, createdAt: new Date(person.joined) })
+        .values({
+          organizationId,
+          userId: user.id,
+          role: person.role,
+          createdAt: new Date(person.joined),
+        })
         .returning();
       memberIds.set(person.name, member.id);
     }

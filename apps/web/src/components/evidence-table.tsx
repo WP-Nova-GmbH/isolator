@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { usePermissions } from '@/lib/members';
 import type { EvidenceItem } from '@/lib/soa';
 
 function RemoveEvidence({ item }: { item: EvidenceItem }) {
@@ -101,7 +102,7 @@ export function EvidenceTable({ items, showControl = false }: EvidenceTableProps
           </TableRow>
         ))}
         {items.length === 0 && (
-          <EmptyRow colSpan={showControl ? 8 : 6}>No Evidence yet.</EmptyRow>
+          <EmptyRow colSpan={(showControl ? 7 : 5) + (canEdit ? 1 : 0)}>No Evidence yet.</EmptyRow>
         )}
       </TableBody>
     </Table>

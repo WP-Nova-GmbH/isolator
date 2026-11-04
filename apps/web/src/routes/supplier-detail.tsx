@@ -42,6 +42,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { api, attempt } from '@/lib/api';
 import { historyItems } from '@/lib/audit';
+import { usePermissions } from '@/lib/members';
 import type { Asset } from '@/lib/assets';
 import { aYearFromNow, todayIso } from '@/lib/dates';
 import { withUpload } from '@/lib/files';
@@ -120,12 +121,8 @@ export async function supplierDetailAction({ request, params }: ActionFunctionAr
         return api(`${path}/assets`, { method: 'POST', body: { id } });
       case 'unlink-asset':
         return api(`${path}/assets/${id}`, { method: 'DELETE' });
-      case 'add-task':
-        return addTask(form, { supplierRef: params.ref });
-      case 'finish-task':
-        return finishTask(form);
-      case 'cancel-task':
-        return cancelTask(form);
+      default:
+        return taskIntent(form, { supplierRef: params.ref });
     }
   });
 }
@@ -321,6 +318,8 @@ export function SupplierDetail() {
   const navigation = useNavigation();
   const [adding, setAdding] = useState<'file' | 'review' | 'task' | null>(null);
   const ended = supplier.endedAt !== null;
+  const { canEdit } = usePermissions();
+  const locked = ended || !canEdit;
 
   return (
     <>
@@ -364,11 +363,11 @@ export function SupplierDetail() {
         }
       >
         <Form id="supplier-form" method="post" className="flex flex-col gap-6">
-          <fieldset disabled={ended} className="contents">
+          <fieldset disabled={locked} className="contents">
             {/* A new review moves the next review date, so the fields start again from it. */}
             <SupplierFields key={supplier.nextReviewOn} supplier={supplier} />
           </fieldset>
-          {!ended && (
+          {!locked && (
             <div>
               <Button
                 type="submit"

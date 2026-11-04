@@ -14,7 +14,13 @@ const tones = {
   document: { Confirmed: 'success', Draft: 'info', Withdrawn: 'neutral' },
   risk: { Closed: 'neutral' },
   evidence: { Current: 'success', 'Expires soon': 'warning', Expired: 'danger' },
-  task: { Open: 'neutral', Overdue: 'danger', Done: 'success', Cancelled: 'neutral' },
+  task: {
+    Proposed: 'info',
+    Open: 'neutral',
+    Overdue: 'danger',
+    Done: 'success',
+    Cancelled: 'neutral',
+  },
   supplier: {
     Reviewed: 'success',
     'Not reviewed': 'neutral',

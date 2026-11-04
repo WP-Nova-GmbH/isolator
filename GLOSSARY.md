@@ -46,6 +46,8 @@
 
 **Task** – follow-up work with an owner and a due date, linked to the risk, Nonconformity, control, Supplier or Incident it belongs to. A Task that is no longer needed is cancelled with a reason, and stays on record.
 
+**Proposed Task** – a Task recorded before anyone has agreed to it, such as a treatment action still under discussion. It may have no owner or due date yet. Committing to it agrees both, and only then can it be marked done; turning it down cancels it. It keeps its record open like any unfinished Task.
+
 **Register** – a list of records of one kind, each with its own lifecycle: risks, assets, suppliers, incidents, nonconformities.
 
 **Readiness checklist** – everything clauses 4–10 and Annex A need for the certificate, each item marked done, drafted or missing.
@@ -60,6 +62,6 @@
 
 **Evidence** – a file or a link to a Document showing a control is operating (screenshot, scan result, log export), attached to an SoA entry, with the date it carries if that is known. It has no versions and needs no Confirmation.
 
-**Document** – a versioned record the Organization maintains in its audit file, such as a policy, a security objective or a competence record. Each version needs a Confirmation, and the last confirmed version stays in force until a newer one is confirmed.
+**Document** – a versioned record the Organization maintains in its audit file, such as a policy, a procedure, the risk methodology, a security objective, a competence record, an assessment, an inventory or reference material. Each version needs a Confirmation, and the last confirmed version stays in force until a newer one is confirmed. Each version has a source date, the date it carries itself, which may be unknown and is kept apart from when it was added.
 
 **Withdrawn Document** – a Document that no longer applies. It leaves the list with a reason but stays on record, and can be reinstated.

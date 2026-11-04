@@ -37,7 +37,7 @@ import {
   type EvidenceItem,
   type SoaEntryDetail,
 } from '@/lib/soa';
-import { addTask, cancelTask, finishTask } from '@/lib/tasks';
+import { taskIntent } from '@/lib/tasks';
 
 export async function soaEntryLoader({ params }: LoaderFunctionArgs) {
   const [entry, evidence, tasks, documents] = await Promise.all([
@@ -65,12 +65,8 @@ export async function soaEntryAction({ request, params }: ActionFunctionArgs) {
         return addEvidence(form, params.ref!);
       case 'remove-evidence':
         return api(`/evidence/${form.get('id')}`, { method: 'DELETE' });
-      case 'add-task':
-        return addTask(form, { soaRef: params.ref });
-      case 'finish-task':
-        return finishTask(form);
-      case 'cancel-task':
-        return cancelTask(form);
+      default:
+        return taskIntent(form, { soaRef: params.ref });
     }
   });
 }

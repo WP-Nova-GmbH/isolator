@@ -741,8 +741,11 @@ export const tasks = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
-    ownerId: uuid('owner_id').notNull(),
-    dueOn: date('due_on').notNull(),
+    // A proposed Task can wait for its owner and due date. Committing to it needs both.
+    ownerId: uuid('owner_id'),
+    dueOn: date('due_on'),
+    // Null while the Task is only proposed.
+    committedAt: timestamp('committed_at', { withTimezone: true }),
     doneAt: timestamp('done_at', { withTimezone: true }),
     // A cancelled Task is no longer needed. It stays on record with the reason.
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
@@ -786,6 +789,11 @@ export const tasks = pgTable(
       columns: [t.organizationId, t.nonconformityId],
       foreignColumns: [nonconformities.organizationId, nonconformities.id],
     }).onDelete('cascade'),
+    check(
+      'tasks_committed_with_owner_and_date',
+      sql`${t.committedAt} is null or (${t.ownerId} is not null and ${t.dueOn} is not null)`,
+    ),
+    check('tasks_done_once_committed', sql`${t.doneAt} is null or ${t.committedAt} is not null`),
   ],
 );
 

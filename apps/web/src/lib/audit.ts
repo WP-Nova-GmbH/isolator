@@ -10,6 +10,7 @@ import {
   type Classification,
 } from '@/lib/assets';
 import { documentKindLabels, type DocumentKind } from '@/lib/documents';
+import { roleLabels, type Role } from '@/lib/members';
 import { residualScore, treatmentLabels, type RiskDecision } from '@/lib/risks';
 import { statusLabels, type ImplementationStatus } from '@/lib/soa';
 import {
@@ -244,6 +245,13 @@ function describeDocumentChange(before: Value, after: Value) {
   if ('content' in after && before.content !== after.content) {
     changes.push(`Content of ${version} changed`);
   }
+  if ('datedOn' in after && 'datedOn' in before && before.datedOn !== after.datedOn) {
+    changes.push(
+      after.datedOn
+        ? `Source date of ${version} changed to ${String(after.datedOn)}`
+        : `Source date of ${version} now unknown`,
+    );
+  }
   return changes.join('. ');
 }
 
@@ -380,17 +388,24 @@ export function describeEvent({ action, recordLabel, before, after }: AuditEvent
     case 'document.deleted':
       return 'Document deleted';
     case 'member.invited':
-      return 'Invited to the Organization';
+      return after?.role
+        ? `Invited to the Organization as ${roleLabels[after.role as Role]}`
+        : 'Invited to the Organization';
     case 'member.invitation_revoked':
       return 'Invitation revoked';
     case 'member.joined':
       return `Joined the Organization, invited by ${String(after!.invitedBy)}`;
     case 'member.removed':
       return 'Removed from the Organization';
+    case 'member.role_changed':
+      return `Role changed from ${roleLabels[before!.role as Role]} to ${roleLabels[after!.role as Role]}`;
     case 'organization.renamed':
       return `Organization renamed from “${String(before!.name)}” to “${recordLabel}”`;
     case 'task.added':
+      if (after!.proposed) return 'Task proposed';
       return `Task added for ${String(after!.ownerName)}, due ${String(after!.dueOn)}`;
+    case 'task.committed':
+      return `Committed to: ${String(after!.ownerName)} does it by ${String(after!.dueOn)}`;
     case 'task.finished':
       return 'Task marked done';
     case 'task.cancelled':

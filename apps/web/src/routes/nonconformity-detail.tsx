@@ -25,7 +25,7 @@ import { api, attempt } from '@/lib/api';
 import { historyItems } from '@/lib/audit';
 import { nonconformityPayload, type NonconformityDetail as Details } from '@/lib/nonconformities';
 import { toTask, type ApiTask } from '@/lib/risks';
-import { addTask, cancelTask, finishTask } from '@/lib/tasks';
+import { taskIntent } from '@/lib/tasks';
 
 export async function nonconformityDetailLoader({ params }: LoaderFunctionArgs) {
   const [nonconformity, tasks] = await Promise.all([
@@ -55,12 +55,8 @@ export async function nonconformityDetailAction({ request, params }: ActionFunct
         return api(`${path}/closure`, { method: 'POST', body: { reason } });
       case 'reopen':
         return api(`${path}/reopening`, { method: 'POST', body: { reason } });
-      case 'add-task':
-        return addTask(form, { nonconformityRef: params.ref });
-      case 'finish-task':
-        return finishTask(form);
-      case 'cancel-task':
-        return cancelTask(form);
+      default:
+        return taskIntent(form, { nonconformityRef: params.ref });
     }
   });
 }

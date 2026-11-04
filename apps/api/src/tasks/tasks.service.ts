@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, asc, eq, isNull, or } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { recordEvent } from '../audit/audit-trail';
 import { DB, type Database } from '../db/db.module';
@@ -21,7 +21,7 @@ import {
 } from '../db/schema';
 import { formatIncidentRef, IncidentsService } from '../incidents/incidents.service';
 import type { CurrentMember } from '../members/current-member';
-import { ownerNameOf } from '../members/owner-name';
+import { optionalOwnerNameOf, ownerNameOf } from '../members/owner-name';
 import {
   formatNonconformityRef,
   NonconformitiesService,
@@ -33,11 +33,13 @@ import { formatSupplierRef } from '../suppliers/supplier-rules';
 import { SuppliersService } from '../suppliers/suppliers.service';
 import { today } from '../validation';
 
+// A proposed Task can leave its owner and due date open until someone commits to it.
 export const taskInput = z
   .object({
     title: z.string().trim().min(1, 'Say what needs doing.'),
-    ownerId: z.uuid('Choose an owner.'),
-    dueOn: z.iso.date('Choose a due date.'),
+    proposed: z.boolean().default(false),
+    ownerId: z.uuid('Choose an owner.').nullable(),
+    dueOn: z.iso.date('Choose a due date.').nullable(),
     riskRef: z.string().optional(),
     supplierRef: z.string().optional(),
     incidentRef: z.string().optional(),
@@ -54,9 +56,18 @@ export const taskInput = z
         task.soaRef,
       ].filter(Boolean).length === 1,
     { message: 'Choose what this Task belongs to.' },
-  );
+  )
+  .refine((task) => task.proposed || task.ownerId, { message: 'Choose an owner.' })
+  .refine((task) => task.proposed || task.dueOn, { message: 'Choose a due date.' });
 
-export type TaskInput = z.output<typeof taskInput>;
+/** Leaving out `proposed` commits to the Task straight away. */
+export type TaskInput = z.input<typeof taskInput>;
+
+/** What committing to a proposed Task agrees on. */
+export const commitmentInput = z.object({
+  ownerId: z.uuid('Choose an owner.'),
+  dueOn: z.iso.date('Choose a due date.'),
+});
 
 interface BelongsTo {
   risk: typeof risks.$inferSelect | null;
@@ -113,8 +124,8 @@ export class TasksService {
         nonconformity: nonconformities,
       })
       .from(tasks)
-      .innerJoin(members, eq(members.id, tasks.ownerId))
-      .innerJoin(users, eq(users.id, members.userId))
+      .leftJoin(members, eq(members.id, tasks.ownerId))
+      .leftJoin(users, eq(users.id, members.userId))
       .leftJoin(risks, eq(risks.id, tasks.riskId))
       .leftJoin(soaEntries, eq(soaEntries.id, tasks.soaEntryId))
       .leftJoin(controls, eq(controls.id, soaEntries.controlId))
@@ -155,6 +166,7 @@ export class TasksService {
 
   async create(member: CurrentMember, input: TaskInput) {
     const { organizationId } = member;
+    const proposed = input.proposed ?? false;
     const riskId = input.riskRef
       ? await this.risks.openIdOf(organizationId, input.riskRef)
       : null;
@@ -170,7 +182,7 @@ export class TasksService {
     const soaEntryId = input.soaRef
       ? (await this.soa.entry(organizationId, input.soaRef)).entry.id
       : null;
-    const ownerName = await ownerNameOf(this.db, organizationId, input.ownerId);
+    const ownerName = await optionalOwnerNameOf(this.db, organizationId, input.ownerId);
     return this.db.transaction(async (tx) => {
       const [task] = await tx
         .insert(tasks)
@@ -179,6 +191,7 @@ export class TasksService {
           title: input.title,
           ownerId: input.ownerId,
           dueOn: input.dueOn,
+          committedAt: proposed ? null : new Date(),
           riskId,
           supplierId,
           incidentId,
@@ -196,6 +209,34 @@ export class TasksService {
           input.incidentRef ??
           input.nonconformityRef ??
           input.soaRef,
+        recordLabel: task.title,
+        after: { ownerName, dueOn: task.dueOn, ...(proposed && { proposed: true }) },
+      });
+      return { id: task.id };
+    });
+  }
+
+  /** Agrees who does a proposed Task and by when. From here it counts as open work. */
+  async commit(member: CurrentMember, id: string, input: z.output<typeof commitmentInput>) {
+    const ownerName = await ownerNameOf(this.db, member.organizationId, input.ownerId);
+    return this.db.transaction(async (tx) => {
+      const [task] = await tx
+        .update(tasks)
+        .set({ ownerId: input.ownerId, dueOn: input.dueOn, committedAt: new Date() })
+        .where(
+          and(
+            eq(tasks.organizationId, member.organizationId),
+            eq(tasks.id, id),
+            isNull(tasks.committedAt),
+            isNull(tasks.cancelledAt),
+          ),
+        )
+        .returning();
+      if (!task) await this.refuse(tx, member.organizationId, id);
+      await recordEvent(tx, member, {
+        action: 'task.committed',
+        recordType: 'task',
+        recordId: task.id,
         recordLabel: task.title,
         after: { ownerName, dueOn: task.dueOn },
       });
@@ -239,6 +280,7 @@ export class TasksService {
           and(
             eq(tasks.organizationId, member.organizationId),
             eq(tasks.id, id),
+            isNotNull(tasks.committedAt),
             isNull(tasks.doneAt),
             isNull(tasks.cancelledAt),
           ),
@@ -277,16 +319,21 @@ export class TasksService {
   private state(task: typeof tasks.$inferSelect, now: string) {
     if (task.cancelledAt) return 'Cancelled';
     if (task.doneAt) return 'Done';
+    if (!task.committedAt || !task.dueOn) return 'Proposed';
     return task.dueOn < now ? 'Overdue' : 'Open';
   }
 
-  /** Says why an update found nothing to change: the Task is gone, or it is already finished. */
+  /** Says why an update found nothing to change: the Task is gone, finished, or not agreed yet. */
   private async refuse(db: Pick<Database, 'select'>, organizationId: string, id: string): Promise<never> {
     const [task] = await db
-      .select({ id: tasks.id })
+      .select()
       .from(tasks)
       .where(and(eq(tasks.organizationId, organizationId), eq(tasks.id, id)));
     if (!task) throw new NotFoundException('This Task does not exist.');
-    throw new ConflictException('This Task is already finished.');
+    if (task.doneAt || task.cancelledAt) {
+      throw new ConflictException('This Task is already finished.');
+    }
+    if (task.committedAt) throw new ConflictException('This Task is already committed to.');
+    throw new ConflictException('Commit to this Task first: agree who does it and by when.');
   }
 }

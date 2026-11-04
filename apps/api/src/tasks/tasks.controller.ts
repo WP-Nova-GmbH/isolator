@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { Member, MemberGuard, type CurrentMember } from '../members/current-member';
 import { parseBody, reasonInput } from '../validation';
-import { taskInput, TasksService } from './tasks.service';
+import { commitmentInput, taskInput, TasksService } from './tasks.service';
 
 @Controller('tasks')
 @UseGuards(MemberGuard)
@@ -48,6 +48,15 @@ export class TasksController {
     @Body() body: unknown,
   ) {
     return this.tasks.cancel(member, id, parseBody(reasonInput, body).reason);
+  }
+
+  @Post(':id/commitment')
+  commit(
+    @Member() member: CurrentMember,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    return this.tasks.commit(member, id, parseBody(commitmentInput, body));
   }
 
   @Post(':id/completion')
