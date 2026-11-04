@@ -56,7 +56,15 @@ import { Risks, risksLoader } from './routes/risks';
 import { SignIn, signInLoader } from './routes/sign-in';
 import { Soa, soaAction, soaLoader } from './routes/soa';
 import { SoaEntry, soaEntryAction, soaEntryLoader } from './routes/soa-entry';
-import { SupplierDetail, supplierDetailAction, supplierDetailLoader } from './routes/supplier-detail';
+import {
+  SupplierAssets,
+  SupplierDetail,
+  supplierDetailAction,
+  supplierDetailLoader,
+  SupplierFiles,
+  SupplierReviews,
+  SupplierTasks,
+} from './routes/supplier-detail';
 import { SupplierNew, supplierNewAction } from './routes/supplier-new';
 import { Suppliers, suppliersLoader } from './routes/suppliers';
 import { Tasks, tasksAction, tasksLoader } from './routes/tasks';
@@ -126,6 +134,13 @@ const routes: RouteObject[] = [
             loader: supplierDetailLoader,
             action: supplierDetailAction,
             element: <SupplierDetail />,
+            // Each tab is a route. A form inside a tab posts to it, so each shares the action.
+            children: [
+              { index: true, action: supplierDetailAction, element: <SupplierFiles /> },
+              { path: 'reviews', action: supplierDetailAction, element: <SupplierReviews /> },
+              { path: 'tasks', action: supplierDetailAction, element: <SupplierTasks /> },
+              { path: 'assets', action: supplierDetailAction, element: <SupplierAssets /> },
+            ],
           },
           {
             path: 'evidence',

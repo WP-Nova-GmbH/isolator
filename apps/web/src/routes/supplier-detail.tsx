@@ -2,10 +2,13 @@ import { useState } from 'react';
 import { XIcon } from 'lucide-react';
 import {
   Link,
+  Outlet,
   redirect,
   useActionData,
   useFetcher,
   useLoaderData,
+  useLocation,
+  useOutletContext,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
 } from 'react-router';
@@ -24,6 +27,7 @@ import { PageHeader } from '@/components/page-header';
 import { RiskScore } from '@/components/risk-score';
 import { StateBadge } from '@/components/state-badge';
 import { SupplierFields } from '@/components/supplier-fields';
+import { TabNav } from '@/components/tab-nav';
 import { DataCell, EmptyRow, MainCell, Ref } from '@/components/table-parts';
 import { TasksTable } from '@/components/tasks-table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -39,7 +43,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { api, attempt } from '@/lib/api';
 import { historyItems } from '@/lib/audit';
@@ -57,7 +60,7 @@ import {
   type SupplierDetail as Supplier,
   type SupplierFile,
 } from '@/lib/suppliers';
-import { taskIntent } from '@/lib/tasks';
+import { taskIntent, type Task } from '@/lib/tasks';
 import { useFormFetcher } from '@/lib/use-form-fetcher';
 
 export async function supplierDetailLoader({ params }: LoaderFunctionArgs) {
@@ -319,21 +322,33 @@ function contractFact(supplier: Supplier) {
   return supplier.contractTerm && contractTermLabels[supplier.contractTerm];
 }
 
-type Tab = 'files' | 'reviews' | 'tasks' | 'assets';
-
-function Count({ n }: { n: number }) {
-  return <span className="text-xs text-muted-foreground tabular-nums">{n}</span>;
+interface SupplierTabContext {
+  supplier: Supplier;
+  tasks: Task[];
+  ended: boolean;
+  locked: boolean;
 }
 
+/** The Supplier's page: header, facts, and tabs whose content is the child route. */
 export function SupplierDetail() {
   const { supplier, tasks, assets } = useLoaderData<typeof supplierDetailLoader>();
   const result = useActionData<typeof supplierDetailAction>();
-  const [tab, setTab] = useState<Tab>('files');
+  const { pathname } = useLocation();
   const [adding, setAdding] = useState<'file' | 'review' | 'task' | null>(null);
   const ended = supplier.endedAt !== null;
   const { canEdit } = usePermissions();
   const locked = ended || !canEdit;
   const close = () => setAdding(null);
+
+  // Each tab is a route of its own, so it can be linked to and reached with Back.
+  const base = `/suppliers/${supplier.ref}`;
+  const tabs = [
+    { key: 'files', to: base, label: 'Files', count: supplier.files.length },
+    { key: 'reviews', to: `${base}/reviews`, label: 'Reviews', count: supplier.reviews.length },
+    { key: 'tasks', to: `${base}/tasks`, label: 'Tasks', count: tasks.length },
+    { key: 'assets', to: `${base}/assets`, label: 'Assets', count: supplier.assets.length },
+  ] as const;
+  const current = tabs.find((tab) => tab.to === pathname.replace(/\/$/, '')) ?? tabs[0];
 
   // The open tab's own action sits beside the tabs.
   const tabAction = {
@@ -361,7 +376,7 @@ export function SupplierDetail() {
           .map((asset) => ({ id: asset.id, label: asset.name }))}
       />
     ),
-  }[tab];
+  }[current.key];
 
   return (
     <>
@@ -436,144 +451,150 @@ export function SupplierDetail() {
           </Facts>
         </section>
 
-        <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
+        <section aria-label={current.label} className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <TabsList aria-label="What is on record for this Supplier">
-              <TabsTrigger value="files">
-                Files <Count n={supplier.files.length} />
-              </TabsTrigger>
-              <TabsTrigger value="reviews">
-                Reviews <Count n={supplier.reviews.length} />
-              </TabsTrigger>
-              <TabsTrigger value="tasks">
-                Tasks <Count n={tasks.length} />
-              </TabsTrigger>
-              <TabsTrigger value="assets">
-                Assets <Count n={supplier.assets.length} />
-              </TabsTrigger>
-            </TabsList>
+            <TabNav
+              label="What is on record for this Supplier"
+              items={tabs.map((tab) => ({ ...tab, active: tab === current }))}
+            />
             {tabAction}
           </div>
-
-          <TabsContent value="files">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>File</TableHead>
-                  <TableHead>Where it is kept</TableHead>
-                  <TableHead>Dated</TableHead>
-                  <TableHead>Expires</TableHead>
-                  <TableHead>State</TableHead>
-                  {!locked && <TableHead className="sr-only">Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {supplier.files.map((file) => (
-                  <TableRow key={file.id}>
-                    <TableCell className="min-w-44 whitespace-normal">
-                      <div className="font-medium">{file.title}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {fileKindLabels[file.kind]}
-                      </div>
-                    </TableCell>
-                    <DataCell className="min-w-44 whitespace-normal">
-                      <FileLocation file={file} />
-                    </DataCell>
-                    <DataCell>{file.datedOn ?? UNKNOWN}</DataCell>
-                    <DataCell>{file.expiresOn ?? 'None'}</DataCell>
-                    <TableCell>
-                      <StateBadge kind="evidence" state={file.state} />
-                    </TableCell>
-                    {!locked && (
-                      <TableCell className="py-0">
-                        <RemoveFile file={file} />
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-                {supplier.files.length === 0 && (
-                  <EmptyRow colSpan={6}>No contracts or certificates on file yet.</EmptyRow>
-                )}
-              </TableBody>
-            </Table>
-          </TabsContent>
-
-          <TabsContent value="reviews">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Reviewed by</TableHead>
-                  <TableHead>Outcome</TableHead>
-                  <TableHead>Notes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {supplier.reviews.map((review) => (
-                  <TableRow key={review.id}>
-                    <DataCell>{review.reviewedOn}</DataCell>
-                    <TableCell>{review.reviewerName}</TableCell>
-                    <TableCell>
-                      <StateBadge
-                        kind="supplierReview"
-                        state={reviewOutcomeLabels[review.outcome]}
-                      />
-                    </TableCell>
-                    <MainCell>{review.notes}</MainCell>
-                  </TableRow>
-                ))}
-                {supplier.reviews.length === 0 && (
-                  <EmptyRow colSpan={4}>No reviews yet.</EmptyRow>
-                )}
-              </TableBody>
-            </Table>
-          </TabsContent>
-
-          <TabsContent value="tasks">
-            <TasksTable tasks={tasks} canFinish={!ended} emptyText="No Tasks yet." />
-          </TabsContent>
-
-          <TabsContent value="assets">
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(16rem,100%),1fr))] gap-x-8 gap-y-6">
-              <section aria-label="Assets they provide" className="flex flex-col gap-2">
-                <h3>Assets they provide</h3>
-                {supplier.assets.map((asset) => (
-                  <LinkedItem
-                    key={asset.id}
-                    id={asset.id}
-                    intent="unlink-asset"
-                    label={asset.name}
-                    locked={ended}
-                  >
-                    {asset.name}
-                  </LinkedItem>
-                ))}
-                {supplier.assets.length === 0 && (
-                  <p className="text-muted-foreground">No assets linked yet.</p>
-                )}
-              </section>
-              <section aria-label="Risks through those assets" className="flex flex-col gap-2">
-                <h3>Risks through those assets</h3>
-                {supplier.risks.map((risk) => (
-                  <div key={risk.ref} className="flex items-center justify-between gap-2">
-                    <Link to={`/risks/${risk.ref}`} className="min-w-0 hover:underline">
-                      {risk.title}
-                    </Link>
-                    <RiskScore {...currentScore(risk)} />
-                  </div>
-                ))}
-                {supplier.risks.length === 0 && (
-                  <p className="text-muted-foreground">No open risks touch these assets.</p>
-                )}
-              </section>
-            </div>
-          </TabsContent>
-        </Tabs>
+          <Outlet context={{ supplier, tasks, ended, locked } satisfies SupplierTabContext} />
+        </section>
       </DetailLayout>
 
       {adding === 'file' && <FileForm onClose={close} />}
       {adding === 'review' && <ReviewForm onClose={close} />}
       {adding === 'task' && <NewTaskForm onClose={close} />}
     </>
+  );
+}
+
+/** The index tab: contracts, certificates and other paperwork. */
+export function SupplierFiles() {
+  const { supplier, locked } = useOutletContext<SupplierTabContext>();
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>File</TableHead>
+          <TableHead>Where it is kept</TableHead>
+          <TableHead>Dated</TableHead>
+          <TableHead>Expires</TableHead>
+          <TableHead>State</TableHead>
+          {!locked && <TableHead className="sr-only">Actions</TableHead>}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {supplier.files.map((file) => (
+          <TableRow key={file.id}>
+            <TableCell className="min-w-44 whitespace-normal">
+              <div className="font-medium">{file.title}</div>
+              <div className="text-xs text-muted-foreground">{fileKindLabels[file.kind]}</div>
+            </TableCell>
+            <DataCell className="min-w-44 whitespace-normal">
+              <FileLocation file={file} />
+            </DataCell>
+            <DataCell>{file.datedOn ?? UNKNOWN}</DataCell>
+            <DataCell>{file.expiresOn ?? 'None'}</DataCell>
+            <TableCell>
+              <StateBadge kind="evidence" state={file.state} />
+            </TableCell>
+            {!locked && (
+              <TableCell className="py-0">
+                <RemoveFile file={file} />
+              </TableCell>
+            )}
+          </TableRow>
+        ))}
+        {supplier.files.length === 0 && (
+          <EmptyRow colSpan={6}>No contracts or certificates on file yet.</EmptyRow>
+        )}
+      </TableBody>
+    </Table>
+  );
+}
+
+export function SupplierReviews() {
+  const { supplier } = useOutletContext<SupplierTabContext>();
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Date</TableHead>
+          <TableHead>Reviewed by</TableHead>
+          <TableHead>Outcome</TableHead>
+          <TableHead>Notes</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {supplier.reviews.map((review) => (
+          <TableRow key={review.id}>
+            <DataCell>{review.reviewedOn}</DataCell>
+            <TableCell>{review.reviewerName}</TableCell>
+            <TableCell>
+              <StateBadge kind="supplierReview" state={reviewOutcomeLabels[review.outcome]} />
+            </TableCell>
+            <MainCell>{review.notes}</MainCell>
+          </TableRow>
+        ))}
+        {supplier.reviews.length === 0 && <EmptyRow colSpan={4}>No reviews yet.</EmptyRow>}
+      </TableBody>
+    </Table>
+  );
+}
+
+/** Marking a Task done posts to this route, so its refusal shows here. */
+export function SupplierTasks() {
+  const { tasks, ended } = useOutletContext<SupplierTabContext>();
+  const result = useActionData<typeof supplierDetailAction>();
+
+  return (
+    <>
+      <FormError message={result?.error} />
+      <TasksTable tasks={tasks} canFinish={!ended} emptyText="No Tasks yet." />
+    </>
+  );
+}
+
+export function SupplierAssets() {
+  const { supplier, ended } = useOutletContext<SupplierTabContext>();
+
+  return (
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(16rem,100%),1fr))] gap-x-8 gap-y-6">
+      <section aria-label="Assets they provide" className="flex flex-col gap-2">
+        <h3>Assets they provide</h3>
+        {supplier.assets.map((asset) => (
+          <LinkedItem
+            key={asset.id}
+            id={asset.id}
+            intent="unlink-asset"
+            label={asset.name}
+            locked={ended}
+          >
+            {asset.name}
+          </LinkedItem>
+        ))}
+        {supplier.assets.length === 0 && (
+          <p className="text-muted-foreground">No assets linked yet.</p>
+        )}
+      </section>
+      <section aria-label="Risks through those assets" className="flex flex-col gap-2">
+        <h3>Risks through those assets</h3>
+        {supplier.risks.map((risk) => (
+          <div key={risk.ref} className="flex items-center justify-between gap-2">
+            <Link to={`/risks/${risk.ref}`} className="min-w-0 hover:underline">
+              {risk.title}
+            </Link>
+            <RiskScore {...currentScore(risk)} />
+          </div>
+        ))}
+        {supplier.risks.length === 0 && (
+          <p className="text-muted-foreground">No open risks touch these assets.</p>
+        )}
+      </section>
+    </div>
   );
 }

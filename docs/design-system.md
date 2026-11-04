@@ -14,6 +14,10 @@ This is the rule every page follows. A page shows the ISMS as it stands. The ISM
 - **No inputs sit open on a page.** There are two exceptions. Controls that only change what you see, such as a filter or the language, stay on the page. So do pages whose only job is to create something, such as Add Supplier.
 - **Confirming confirms what the page shows,** which is what is saved.
 
+A page full of inputs looks unfinished, invites changes nobody meant to make, and hides which facts are missing. A dialog makes each change deliberate and easy to back out of, and the Audit trail records only what someone meant to do.
+
+Build the read-only view with `Facts`, a record's Edit dialog with `EditDialog`, and any other form with `FormDialog`. Field components such as `SupplierFields` group their fields with `FieldSection`: a card on a create page, a plain group inside a dialog.
+
 A record's page is laid out so that it never feels crowded:
 
 - **Header:** the record's name, with a one-line description under it when there is one (what a Supplier provides). On the right: its state, **Edit**, and a ⋯ menu for rare actions such as ending, closing or deleting it.
@@ -21,9 +25,13 @@ A record's page is laid out so that it never feels crowded:
 - **Related records** (files, reviews, Tasks, linked assets): below the facts. When there are several kinds, they go in tabs with a count each, one shown at a time. The open tab's action, such as Add file, sits to the right of the tabs.
 - **Side column:** what needs the reader, such as a Confirmation or what needs attention, and the record's History.
 
-A page full of inputs looks unfinished, invites changes nobody meant to make, and hides which facts are missing. A dialog makes each change deliberate and easy to back out of, and the Audit trail records only what someone meant to do.
+### Tabs are routes
 
-Build the read-only view with `Facts`, a record's Edit dialog with `EditDialog`, and any other form with `FormDialog`. Field components such as `SupplierFields` group their fields with `FieldSection`: a card on a create page, a plain group inside a dialog.
+Every tab has its own URL, so it can be linked to, bookmarked, sent to an auditor, and reached again with Back. A tab is never state held in a component.
+
+- A tab that shows a part of a page is a nested route. The first tab is the index: `/suppliers/S-03` shows the files, and `/suppliers/S-03/reviews` the reviews. The page's route owns the header, the facts and the tabs, and renders the open tab with `<Outlet>`.
+- A tab that filters a single list is a search param on that list's route: `/incidents?tab=closed`, through `useTabFilter`.
+- Build both with `TabNav`. A form inside a tab posts to the tab's route, so the tab routes share the page's action.
 
 ## Logo
 
@@ -136,7 +144,6 @@ Base components live in `components/ui/`. They started as stock shadcn and are o
 | `Table` | `ui/table.tsx` | Registers. Bleeds 10 px past the sheet's padding, so cell text lines up with headings and hover rows reach past it |
 | `Alert` | `ui/alert.tsx` | `destructive` for load failures and blocking errors |
 | `Dialog` | `ui/dialog.tsx` | Every form on a page opens in one. Use it through `FormDialog` |
-| `Tabs` | `ui/tabs.tsx` | A record's related records, one kind at a time. Looks like `TabNav`, which is for tabs that are links |
 | `DropdownMenu` | `ui/dropdown-menu.tsx` | The ⋯ menu on a record's page. Use it through `LifecycleMenu` |
 | `Skeleton` | `ui/skeleton.tsx` | Loading states. The pulse stops under `prefers-reduced-motion` |
 | `Sidebar` | `ui/sidebar.tsx` | App shell, `inset` variant. A 240 px rail on desktop, a sheet on phones |
@@ -147,7 +154,7 @@ Base components live in `components/ui/`. They started as stock shadcn and are o
 | `RiskMatrix` | `risk-matrix.tsx` | The fixed 5 × 5 matrix |
 | `StateBadge` | `state-badge.tsx` | `Badge` for a domain state. The only place states map to tones |
 | `PageHeader`, `SectionHeader` | `page-header.tsx` | Title, description and actions |
-| `TabNav`, `RiskTabs`, `useTabFilter` | `tab-nav.tsx` | Segmented tabs made of links: routes, or a filter in the URL |
+| `TabNav`, `RiskTabs`, `useTabFilter` | `tab-nav.tsx` | The only tabs: segmented links, each to its own URL. A part of a page is a route, a filter of one list a search param. Give an item a `count` to show how many records it holds |
 | `StatGrid`, `StatTile` | `stat-tile.tsx` | Summary numbers on a sunken tile |
 | `HistoryList` | `history-list.tsx` | Timeline of Confirmations or Document versions |
 | `ConfirmationCard` | `confirmation-card.tsx` | The same card on every record that needs a Confirmation. Confirms the record as saved, which is what the page shows |
