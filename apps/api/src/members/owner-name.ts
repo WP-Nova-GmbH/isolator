@@ -8,7 +8,7 @@ type Reader = Pick<Database, 'select'>;
 
 async function activeMember(db: Reader, organizationId: string, memberId: string) {
   const [member] = await db
-    .select({ name: users.name })
+    .select({ name: users.name, role: members.role })
     .from(members)
     .innerJoin(users, eq(users.id, members.userId))
     .where(
@@ -21,14 +21,22 @@ async function activeMember(db: Reader, organizationId: string, memberId: string
   return member;
 }
 
-export async function isActiveMember(db: Reader, organizationId: string, memberId: string) {
-  return (await activeMember(db, organizationId, memberId)) !== undefined;
+/** Whether a Member can own records: they are still a Member, and not an Auditor. */
+export async function canOwn(db: Reader, organizationId: string, memberId: string) {
+  const member = await activeMember(db, organizationId, memberId);
+  return member !== undefined && member.role !== 'auditor';
 }
 
-/** The name of the Member chosen to own something. Someone removed can't take on anything new. */
+/**
+ * The name of the Member chosen to own something. Someone removed can't take on anything new, and
+ * an Auditor only reads.
+ */
 export async function ownerNameOf(db: Reader, organizationId: string, memberId: string) {
   const member = await activeMember(db, organizationId, memberId);
   if (!member) throw new BadRequestException('Choose an owner from your Members.');
+  if (member.role === 'auditor') {
+    throw new BadRequestException(`${member.name} is an Auditor, who can’t own anything.`);
+  }
   return member.name;
 }
 
@@ -48,8 +56,8 @@ interface Return<Id> {
 
 /**
  * Who owns a record coming back into use. A closed record keeps the name of an owner who has
- * since left, so whoever brings it back takes it over, and its event shows the change. A record
- * nobody owned stays unassigned.
+ * since left or become an Auditor, so whoever brings it back takes it over, and its event shows
+ * the change. A record nobody owned stays unassigned.
  */
 export async function ownerOnReturn(
   db: Reader,
@@ -70,7 +78,7 @@ export async function ownerOnReturn(
   ownerName: string | null,
 ): Promise<Return<string | null>> {
   if (ownerId === null) return { id: null, change: {} };
-  if (await activeMember(db, member.organizationId, ownerId)) return { id: ownerId, change: {} };
+  if (await canOwn(db, member.organizationId, ownerId)) return { id: ownerId, change: {} };
   return {
     id: member.id,
     change: { before: { ownerName }, after: { ownerName: member.name } },

@@ -6,6 +6,7 @@ import { createDb } from '../db/client';
 import { invitations, members, organizations, risks, sessions, tasks, users } from '../db/schema';
 import type { CurrentMember, CurrentUser } from '../members/current-member';
 import { MembersService } from '../members/members.service';
+import { ownerNameOf } from '../members/owner-name';
 import { testDatabaseUrl } from '../test/database';
 import { InstallService } from './install.service';
 import { InvitationsService } from './invitations.service';
@@ -58,6 +59,7 @@ async function addMember(name: string) {
     organizationName: organization.name,
     name,
     email: created.email,
+    role: member.role,
   };
   return { ...current, userId: created.id };
 }
@@ -169,7 +171,7 @@ describe('invitations', () => {
   it('create a Member, and appear in the Audit trail', async () => {
     const inviter = await addMember('Anna');
     const invited = await addUser('New Person');
-    const { token } = await invitationService.invite(inviter, invited.email);
+    const { token } = await invitationService.invite(inviter, invited.email, 'editor');
     expect(await invitationService.list(inviter.organizationId)).toMatchObject([
       { email: invited.email, invitedBy: 'Anna' },
     ]);
@@ -186,7 +188,7 @@ describe('invitations', () => {
 
   it('keep only the hash of the token', async () => {
     const inviter = await addMember('Anna');
-    const { id, token } = await invitationService.invite(inviter, email());
+    const { id, token } = await invitationService.invite(inviter, email(), 'editor');
     const [row] = await db.select().from(invitations).where(eq(invitations.id, id));
     expect(row.tokenHash).not.toContain(token);
   });
@@ -194,14 +196,14 @@ describe('invitations', () => {
   it('work once', async () => {
     const inviter = await addMember('Anna');
     const invited = await addUser('Once');
-    const { token } = await invitationService.invite(inviter, invited.email);
+    const { token } = await invitationService.invite(inviter, invited.email, 'editor');
     await acceptAs(invited, token);
     await expect(acceptAs(invited, token)).rejects.toThrow('no longer works');
   });
 
   it('expire', async () => {
     const inviter = await addMember('Anna');
-    const { id, token } = await invitationService.invite(inviter, email());
+    const { id, token } = await invitationService.invite(inviter, email(), 'editor');
     await db
       .update(invitations)
       .set({ expiresAt: new Date(Date.now() - 1000) })
@@ -212,7 +214,7 @@ describe('invitations', () => {
 
   it('stop working once revoked', async () => {
     const inviter = await addMember('Anna');
-    const { id, token } = await invitationService.invite(inviter, email());
+    const { id, token } = await invitationService.invite(inviter, email(), 'editor');
     await invitationService.revoke(inviter, id);
     await expect(invitationService.find(token)).rejects.toThrow('no longer works');
   });
@@ -220,7 +222,7 @@ describe('invitations', () => {
   it('can’t be revoked from another Organization', async () => {
     const inviter = await addMember('Anna');
     const outsider = await addMember('Mallory');
-    const { id, token } = await invitationService.invite(inviter, email());
+    const { id, token } = await invitationService.invite(inviter, email(), 'editor');
     await expect(invitationService.revoke(outsider, id)).rejects.toThrow('doesn’t exist');
     await expect(invitationService.find(token)).resolves.toBeDefined();
   });
@@ -228,8 +230,8 @@ describe('invitations', () => {
   it('replace the earlier link when someone is invited again', async () => {
     const inviter = await addMember('Anna');
     const invited = email();
-    const first = await invitationService.invite(inviter, invited);
-    const second = await invitationService.invite(inviter, invited);
+    const first = await invitationService.invite(inviter, invited, 'editor');
+    const second = await invitationService.invite(inviter, invited, 'editor');
     await expect(invitationService.find(first.token)).rejects.toThrow('no longer works');
     await expect(invitationService.find(second.token)).resolves.toMatchObject({ email: invited });
     expect(await invitationService.list(inviter.organizationId)).toHaveLength(1);
@@ -237,7 +239,7 @@ describe('invitations', () => {
 
   it('refuse someone who is already a Member', async () => {
     const inviter = await addMember('Anna');
-    await expect(invitationService.invite(inviter, inviter.email)).rejects.toThrow(
+    await expect(invitationService.invite(inviter, inviter.email, 'editor')).rejects.toThrow(
       'already a Member',
     );
   });
@@ -245,7 +247,7 @@ describe('invitations', () => {
   it('only let in the person invited', async () => {
     const inviter = await addMember('Anna');
     const elsewhere = await addMember('Ben');
-    const { token } = await invitationService.invite(inviter, elsewhere.email);
+    const { token } = await invitationService.invite(inviter, elsewhere.email, 'editor');
 
     await expect(
       invitationService.accept(token, user({ email: inviter.email })),
@@ -264,7 +266,7 @@ describe('invitations', () => {
     const invited = await addUser('New Person');
     const sessionId = randomUUID();
     await db.insert(sessions).values({ id: sessionId, userId: invited.id });
-    const { token } = await invitationService.invite(inviter, invited.email);
+    const { token } = await invitationService.invite(inviter, invited.email, 'editor');
 
     await invitationService.accept(
       token,
@@ -346,7 +348,7 @@ describe('removing a Member', () => {
     const anna = await addMember('Anna');
     const leaver = await addColleague(anna, 'Leaver');
     await memberService.remove(anna, leaver.id, 'Left');
-    const { token } = await invitationService.invite(anna, leaver.email);
+    const { token } = await invitationService.invite(anna, leaver.email, 'editor');
     await invitationService.accept(
       token,
       user({ id: leaver.userId, email: leaver.email, name: 'Leaver' }),
@@ -375,5 +377,87 @@ describe('renaming the Organization', () => {
       before: { name: 'Test' },
       after: { name: 'Better Name' },
     });
+  });
+});
+
+describe('roles', () => {
+  async function administrator(name: string) {
+    const member = await addMember(name);
+    await db.update(members).set({ role: 'administrator' }).where(eq(members.id, member.id));
+    return { ...member, role: 'administrator' as const };
+  }
+
+  it('come with the invitation', async () => {
+    const anna = await administrator('Anna');
+    const invited = await addUser('Reviewer');
+    const { token } = await invitationService.invite(anna, invited.email, 'reviewer');
+    expect(await invitationService.list(anna.organizationId)).toMatchObject([
+      { email: invited.email, role: 'reviewer' },
+    ]);
+    await acceptAs(invited, token);
+    const list = await memberService.list(anna.organizationId);
+    expect(list.find((member) => member.name === 'Reviewer')?.role).toBe('reviewer');
+  });
+
+  it('make the first Member of a new Organization its Administrator', async () => {
+    const operator = await addUser('Operator');
+    const invited = await addUser('First');
+    const { id, token } = await organizationService.create(
+      user({ id: operator.id, email: operator.email }),
+      { name: 'New Org', email: invited.email },
+    );
+    await acceptAs(invited, token);
+    expect((await memberService.list(id))[0]).toMatchObject({ name: 'First', role: 'administrator' });
+  });
+
+  it('can be changed, and the Audit trail keeps what it was', async () => {
+    const anna = await administrator('Anna');
+    const colleague = await addColleague(anna, 'Colleague');
+    await memberService.changeRole(anna, colleague.id, 'auditor');
+    const list = await memberService.list(anna.organizationId);
+    expect(list.find((member) => member.id === colleague.id)?.role).toBe('auditor');
+    const { events } = await trail.list(anna.organizationId, 'members');
+    expect(events[0]).toMatchObject({
+      action: 'member.role_changed',
+      recordLabel: 'Colleague',
+      before: { role: 'editor' },
+      after: { role: 'auditor' },
+    });
+  });
+
+  it('always leave the Organization an Administrator', async () => {
+    const anna = await administrator('Anna');
+    await expect(memberService.changeRole(anna, anna.id, 'editor')).rejects.toThrow(
+      'Anna is the only Administrator.',
+    );
+    const colleague = await addColleague(anna, 'Colleague');
+    await memberService.changeRole(anna, colleague.id, 'administrator');
+    await expect(memberService.changeRole(anna, anna.id, 'editor')).resolves.toBeUndefined();
+  });
+
+  it('don’t let an Auditor own anything', async () => {
+    const anna = await administrator('Anna');
+    const colleague = await addColleague(anna, 'Colleague');
+    const [risk] = await db
+      .insert(risks)
+      .values({
+        organizationId: anna.organizationId,
+        number: 1,
+        title: 'Theirs',
+        likelihood: 2,
+        impact: 2,
+        ownerId: colleague.id,
+        reviewOn: '2027-01-01',
+      })
+      .returning();
+    await expect(memberService.changeRole(anna, colleague.id, 'auditor')).rejects.toThrow(
+      'Colleague still owns 1 risk, and an Auditor can’t own anything.',
+    );
+
+    await db.update(risks).set({ ownerId: anna.id }).where(eq(risks.id, risk.id));
+    await memberService.changeRole(anna, colleague.id, 'auditor');
+    await expect(ownerNameOf(db, anna.organizationId, colleague.id)).rejects.toThrow(
+      'Colleague is an Auditor, who can’t own anything.',
+    );
   });
 });

@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { api, attempt } from '@/lib/api';
 import { historyItems } from '@/lib/audit';
+import { usePermissions } from '@/lib/members';
 import { incidentPayload, type IncidentDetail as Incident } from '@/lib/incidents';
 import { toTask, type ApiTask, type Risk } from '@/lib/risks';
 import { taskIntent } from '@/lib/tasks';
@@ -134,7 +135,7 @@ export function IncidentDetail() {
           <fieldset disabled={locked} className="contents">
             <IncidentFields key={incident.ref} incident={incident} risks={risks} />
           </fieldset>
-          {!closed && (
+          {!locked && (
             <div>
               <Button
                 type="submit"
@@ -151,7 +152,7 @@ export function IncidentDetail() {
 
         <section className="flex flex-col gap-3">
           <SectionHeader title="Tasks">
-            {!closed && (
+            {!locked && (
               <Button type="button" variant="outline" onClick={() => setAddingTask(true)}>
                 New Task
               </Button>

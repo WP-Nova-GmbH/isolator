@@ -16,6 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { api } from '@/lib/api';
+import { usePermissions } from '@/lib/members';
 import { documentKindLabels, type IsmsDocument } from '@/lib/documents';
 
 export async function documentsLoader() {
@@ -27,6 +28,7 @@ export async function documentsLoader() {
 }
 
 export function Documents() {
+  const { canEdit } = usePermissions();
   const { documents, withdrawn } = useLoaderData<typeof documentsLoader>();
   // ?tab= as on other lists, so the readiness checklist can link to one kind.
   const [params, setParams] = useSearchParams();
@@ -39,9 +41,11 @@ export function Documents() {
         title="Documents"
         description="Everything you maintain for the audit file. Each version needs a Confirmation."
         actions={
-          <Button asChild>
-            <Link to="/documents/new">New Document</Link>
-          </Button>
+          canEdit && (
+            <Button asChild>
+              <Link to="/documents/new">New Document</Link>
+            </Button>
+          )
         }
       />
       <div className="flex items-center gap-2 self-start">

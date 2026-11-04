@@ -3,6 +3,7 @@ import { XIcon } from 'lucide-react';
 import { useFetcher } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { NativeSelect } from '@/components/ui/native-select';
+import { usePermissions } from '@/lib/members';
 
 interface LinkPickerProps {
   label: string;
@@ -16,6 +17,7 @@ export function LinkPicker({ label, intent, options }: LinkPickerProps) {
   const fetcher = useFetcher();
   const [open, setOpen] = useState(false);
 
+  if (!usePermissions().canEdit) return null;
   if (!open) {
     return (
       <Button
@@ -65,11 +67,12 @@ interface LinkedItemProps {
 /** A linked record with a button to remove the link. */
 export function LinkedItem({ id, intent, label, locked = false, children }: LinkedItemProps) {
   const fetcher = useFetcher();
+  const { canEdit } = usePermissions();
 
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="flex min-w-0 items-baseline gap-2">{children}</span>
-      {!locked && (
+      {!locked && canEdit && (
         <fetcher.Form method="post">
           <input type="hidden" name="id" value={id} />
           <Button

@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { api, attempt } from '@/lib/api';
 import { historyItems } from '@/lib/audit';
+import { usePermissions } from '@/lib/members';
 import { nonconformityPayload, type NonconformityDetail as Details } from '@/lib/nonconformities';
 import { toTask, type ApiTask } from '@/lib/risks';
 import { taskIntent } from '@/lib/tasks';
@@ -137,7 +138,7 @@ export function NonconformityDetail() {
           <fieldset disabled={locked} className="contents">
             <NonconformityFields key={nonconformity.ref} nonconformity={nonconformity} />
           </fieldset>
-          {!closed && (
+          {!locked && (
             <div>
               <Button
                 type="submit"
@@ -154,7 +155,7 @@ export function NonconformityDetail() {
 
         <section className="flex flex-col gap-3">
           <SectionHeader title="Tasks">
-            {!closed && (
+            {!locked && (
               <Button type="button" variant="outline" onClick={() => setAddingTask(true)}>
                 New Task
               </Button>

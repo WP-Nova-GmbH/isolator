@@ -16,7 +16,7 @@ import {
   tasks,
   users,
 } from '../db/schema';
-import type { CurrentMember } from './current-member';
+import type { CurrentMember, Role } from './current-member';
 
 type OwnedTable =
   | typeof risks
@@ -31,6 +31,10 @@ type OwnedTable =
 export const organizationInput = z.object({
   name: z.string().trim().min(1, 'Give the Organization a name.'),
 });
+
+export const roles = ['administrator', 'editor', 'reviewer', 'auditor'] as const;
+
+export const roleInput = z.object({ role: z.enum(roles, 'Choose a role.') });
 
 @Injectable()
 export class MembersService {
@@ -48,6 +52,7 @@ export class MembersService {
         id: members.id,
         name: users.name,
         email: users.email,
+        role: members.role,
         joinedAt: members.createdAt,
         risksOwned: owned.risksOwned,
       })
@@ -62,18 +67,7 @@ export class MembersService {
   /** Ends someone's access. What they did stays on record under their name. */
   async remove(member: CurrentMember, id: string, reason: string) {
     if (id === member.id) throw new ConflictException('Another Member has to remove you.');
-    const [target] = await this.db
-      .select({ id: members.id, name: users.name, email: users.email })
-      .from(members)
-      .innerJoin(users, eq(users.id, members.userId))
-      .where(
-        and(
-          eq(members.organizationId, member.organizationId),
-          eq(members.id, id),
-          isNull(members.removedAt),
-        ),
-      );
-    if (!target) throw new NotFoundException('That Member doesn’t exist.');
+    const target = await this.activeMember(member.organizationId, id);
 
     const owned = await this.stillOwned(member.organizationId, id);
     if (owned.length > 0) {
@@ -98,6 +92,51 @@ export class MembersService {
     });
   }
 
+  /** What someone may do. The Organization always keeps an Administrator. */
+  async changeRole(member: CurrentMember, id: string, role: Role) {
+    const target = await this.activeMember(member.organizationId, id);
+    if (target.role === role) return;
+    if (target.role === 'administrator') {
+      const [{ administrators }] = await this.db
+        .select({ administrators: count() })
+        .from(members)
+        .where(
+          and(
+            eq(members.organizationId, member.organizationId),
+            eq(members.role, 'administrator'),
+            isNull(members.removedAt),
+          ),
+        );
+      if (administrators === 1) {
+        throw new ConflictException(
+          `${target.name} is the only Administrator. Make someone else one first.`,
+        );
+      }
+    }
+    if (role === 'auditor') {
+      const owned = await this.stillOwned(member.organizationId, id);
+      if (owned.length > 0) {
+        throw new ConflictException(
+          `${target.name} still owns ${owned.join(', ')}, and an Auditor can’t own anything. Give them to someone else first.`,
+        );
+      }
+    }
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(members)
+        .set({ role })
+        .where(and(eq(members.organizationId, member.organizationId), eq(members.id, id)));
+      await recordEvent(tx, member, {
+        action: 'member.role_changed',
+        recordType: 'member',
+        recordId: id,
+        recordLabel: target.name,
+        before: { role: target.role },
+        after: { role },
+      });
+    });
+  }
+
   async rename(member: CurrentMember, name: string) {
     if (name === member.organizationName) return;
     await this.db.transaction(async (tx) => {
@@ -114,6 +153,22 @@ export class MembersService {
         after: { name },
       });
     });
+  }
+
+  private async activeMember(organizationId: string, id: string) {
+    const [target] = await this.db
+      .select({ id: members.id, name: users.name, email: users.email, role: members.role })
+      .from(members)
+      .innerJoin(users, eq(users.id, members.userId))
+      .where(
+        and(
+          eq(members.organizationId, organizationId),
+          eq(members.id, id),
+          isNull(members.removedAt),
+        ),
+      );
+    if (!target) throw new NotFoundException('That Member doesn’t exist.');
+    return target;
   }
 
   /** What would be left without an owner. Closed records keep the name of who owned them. */

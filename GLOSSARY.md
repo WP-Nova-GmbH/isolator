@@ -6,9 +6,11 @@
 
 **Scope** – the boundaries of the ISMS (clause 4.3): which companies, locations, units, systems are covered.
 
-**Member** – a person invited into an Organization. Every Member can see and do everything in its ISMS, except that a risk's Confirmation comes from its risk owner. A removed Member can no longer reach the Organization but stays on record, and comes back the same Member if invited again. Closed records keep their name as owner, and whoever brings one back takes it over.
+**Member** – a person invited into an Organization. Every Member sees everything in its ISMS; their Role decides what they can change, and a risk's Confirmation comes from its risk owner. A removed Member can no longer reach the Organization but stays on record, and comes back the same Member if invited again. Closed records keep their name as owner, and whoever brings one back takes it over.
 
-**Invitation** – a link, good for one use and for 7 days, that lets one email address join an Organization as a Member. Any Member can create one, and the Operator can for any Organization.
+**Role** – what a Member may do. An **Administrator** does everything an Editor does and manages Members, their Roles and the Organization's settings; an Organization always keeps at least one. An **Editor** adds and changes records and gives Confirmations. A **Reviewer** reads everything and gives the decisions made in a person's name: Confirmations, and closing or reopening a risk they own. An **Auditor** reads everything, including the Audit trail and files, changes nothing and owns nothing.
+
+**Invitation** – a link, good for one use and for 7 days, that lets one email address join an Organization as a Member with a given Role. An Administrator creates one. The Operator can for any Organization, and those make the person an Administrator.
 
 **Operator** – the person who claimed an install of Isolator. The Operator creates its Organizations and invites their first Members.
 

@@ -24,6 +24,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { api, attempt } from '@/lib/api';
+import { usePermissions } from '@/lib/members';
 import type { RiskCriteria as Criteria } from '@/lib/risks';
 
 const bands: { band: RiskBand; scores: string; label: string }[] = [
@@ -93,6 +94,7 @@ function LevelTable({
 }
 
 export function RiskCriteria() {
+  const { canEdit } = usePermissions();
   const criteria = useLoaderData<typeof riskCriteriaLoader>();
   const result = useActionData<typeof riskCriteriaAction>();
   const navigation = useNavigation();
@@ -103,9 +105,11 @@ export function RiskCriteria() {
         title="Risks"
         description="The 5 × 5 matrix is fixed. The threshold and the meaning of each level are yours."
         actions={
-          <Button type="submit" form="criteria-form" disabled={navigation.state !== 'idle'}>
-            Save criteria
-          </Button>
+          canEdit && (
+            <Button type="submit" form="criteria-form" disabled={navigation.state !== 'idle'}>
+              Save criteria
+            </Button>
+          )
         }
       />
       <RiskTabs />
@@ -118,37 +122,39 @@ export function RiskCriteria() {
       )}
 
       <Form id="criteria-form" method="post" className="flex flex-col gap-6">
-        <Card aria-label="Acceptance threshold" className="flex flex-col gap-4">
-          <h2>Acceptance threshold</h2>
-          <Field
-            label="Highest score you accept without treatment"
-            htmlFor="threshold"
-            className="max-w-68"
-          >
-            <Input
-              id="threshold"
-              name="acceptanceThreshold"
-              type="number"
-              min={1}
-              max={25}
-              defaultValue={criteria.acceptanceThreshold}
-              required
-            />
-          </Field>
-          <div className="flex flex-wrap items-center gap-2">
-            {bands.map(({ band, scores, label }) => (
-              <span key={band} className="flex items-center gap-2 pr-2">
-                <RiskChip band={band}>{scores}</RiskChip>
-                <span className="text-muted-foreground">{label}</span>
-              </span>
-            ))}
-          </div>
-        </Card>
+        <fieldset disabled={!canEdit} className="contents">
+          <Card aria-label="Acceptance threshold" className="flex flex-col gap-4">
+            <h2>Acceptance threshold</h2>
+            <Field
+              label="Highest score you accept without treatment"
+              htmlFor="threshold"
+              className="max-w-68"
+            >
+              <Input
+                id="threshold"
+                name="acceptanceThreshold"
+                type="number"
+                min={1}
+                max={25}
+                defaultValue={criteria.acceptanceThreshold}
+                required
+              />
+            </Field>
+            <div className="flex flex-wrap items-center gap-2">
+              {bands.map(({ band, scores, label }) => (
+                <span key={band} className="flex items-center gap-2 pr-2">
+                  <RiskChip band={band}>{scores}</RiskChip>
+                  <span className="text-muted-foreground">{label}</span>
+                </span>
+              ))}
+            </div>
+          </Card>
 
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(20rem,100%),1fr))] gap-8">
-          <LevelTable title="Likelihood" name="likelihoodLevels" levels={criteria.likelihoodLevels} />
-          <LevelTable title="Impact" name="impactLevels" levels={criteria.impactLevels} />
-        </div>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(20rem,100%),1fr))] gap-8">
+            <LevelTable title="Likelihood" name="likelihoodLevels" levels={criteria.likelihoodLevels} />
+            <LevelTable title="Impact" name="impactLevels" levels={criteria.impactLevels} />
+          </div>
+        </fieldset>
       </Form>
     </>
   );

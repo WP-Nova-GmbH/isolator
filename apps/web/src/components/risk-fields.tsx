@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Field, FieldGrid } from '@/components/field';
+import { OwnerSelect } from '@/components/owner-select';
 import { RiskScore } from '@/components/risk-score';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -93,7 +94,7 @@ function ScoreCard({
 
 /** The fields of a risk. Goes inside a form; riskPayload reads them back out. */
 export function RiskFields({ risk }: { risk?: RiskDetail }) {
-  const { me, members } = useAppData();
+  const { me } = useAppData();
 
   return (
     <>
@@ -116,13 +117,7 @@ export function RiskFields({ risk }: { risk?: RiskDetail }) {
             </NativeSelect>
           </Field>
           <Field label="Risk owner" htmlFor="ownerId">
-            <NativeSelect id="ownerId" name="ownerId" defaultValue={risk?.ownerId ?? me.id}>
-              {members.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.name}
-                </option>
-              ))}
-            </NativeSelect>
+            <OwnerSelect id="ownerId" name="ownerId" defaultValue={risk?.ownerId ?? me.id} />
           </Field>
           <Field label="Review on" htmlFor="reviewOn">
             <Input

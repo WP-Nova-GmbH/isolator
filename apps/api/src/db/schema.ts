@@ -66,6 +66,9 @@ export const sessions = pgTable('sessions', {
   ...timestamps,
 });
 
+// What a Member may do. See the glossary: Administrator, Editor, Reviewer, Auditor.
+export const memberRole = pgEnum('member_role', ['administrator', 'editor', 'reviewer', 'auditor']);
+
 export const members = pgTable(
   'members',
   {
@@ -76,6 +79,7 @@ export const members = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id),
+    role: memberRole('role').notNull().default('editor'),
     // A removed Member can't reach the Organization, and stays on record in its history.
     removedAt: timestamp('removed_at', { withTimezone: true }),
     removedReason: text('removed_reason'),
@@ -95,6 +99,8 @@ export const invitations = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: 'cascade' }),
     email: text('email').notNull(),
+    // The role the person joins with.
+    role: memberRole('role').notNull().default('editor'),
     // The link holds the token; only its hash is kept, so the table alone lets nobody in.
     tokenHash: text('token_hash').notNull().unique(),
     invitedByName: text('invited_by_name').notNull(),

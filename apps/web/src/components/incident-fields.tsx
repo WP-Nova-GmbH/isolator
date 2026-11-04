@@ -1,4 +1,5 @@
 import { Field, FieldGrid } from '@/components/field';
+import { OwnerSelect } from '@/components/owner-select';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
@@ -15,7 +16,7 @@ interface IncidentFieldsProps {
 
 /** The fields of an Incident. Goes inside a form; incidentPayload reads them back out. */
 export function IncidentFields({ incident, risks }: IncidentFieldsProps) {
-  const { me, members } = useAppData();
+  const { me } = useAppData();
   // A closed risk can stay linked, even though it is no longer offered.
   const linkedRisk = incident?.risk;
   const offered = risks.some((risk) => risk.ref === linkedRisk?.ref);
@@ -40,13 +41,7 @@ export function IncidentFields({ incident, risks }: IncidentFieldsProps) {
           />
         </Field>
         <Field label="Owner" htmlFor="ownerId">
-          <NativeSelect id="ownerId" name="ownerId" defaultValue={incident?.ownerId ?? me.id}>
-            {members.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.name}
-              </option>
-            ))}
-          </NativeSelect>
+          <OwnerSelect id="ownerId" name="ownerId" defaultValue={incident?.ownerId ?? me.id} />
         </Field>
         <Field label="Linked risk" htmlFor="riskRef">
           <NativeSelect id="riskRef" name="riskRef" defaultValue={linkedRisk?.ref ?? ''}>

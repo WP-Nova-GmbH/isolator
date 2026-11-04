@@ -112,7 +112,7 @@ function TaskActions({ task }: { task: Task }) {
 export function TasksTable({
   tasks,
   showBelongsTo = false,
-  canFinish = false,
+  canFinish: open = false,
   emptyText,
 }: TasksTableProps) {
   const canFinish = open && usePermissions().canEdit;

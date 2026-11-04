@@ -384,7 +384,7 @@ export function SupplierDetail() {
 
         <section className="flex flex-col gap-3">
           <SectionHeader title="Contracts and certificates">
-            {!ended && (
+            {!locked && (
               <Button type="button" variant="outline" onClick={() => setAdding('file')}>
                 Add file
               </Button>

@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { usePermissions } from '@/lib/members';
 
 interface ConfirmationCardProps {
   text: string;
@@ -10,12 +11,14 @@ interface ConfirmationCardProps {
   form?: string;
 }
 
+/** Auditors see where the record stands, without the button. */
 export function ConfirmationCard({ text, action, disabled, form }: ConfirmationCardProps) {
+  const { canConfirm } = usePermissions();
   return (
     <Card aria-label="Confirmation" className="flex flex-col gap-3">
       <h2>Confirmation</h2>
       <p className="text-muted-foreground">{text}</p>
-      {action && (
+      {action && canConfirm && (
         <Button
           type={form ? 'submit' : 'button'}
           form={form}

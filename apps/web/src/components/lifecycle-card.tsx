@@ -4,6 +4,7 @@ import { Field } from '@/components/field';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { usePermissions } from '@/lib/members';
 
 export interface LifecycleAction {
   /** Posted to the page's action, with the reason. */
@@ -11,6 +12,8 @@ export interface LifecycleAction {
   label: string;
   prompt: string;
   destructive?: boolean;
+  /** A decision a Reviewer may make too, such as a risk owner closing their risk. */
+  reviewers?: boolean;
 }
 
 interface LifecycleCardProps {
@@ -45,9 +48,15 @@ function ReasonForm({ action, onCancel }: { action: LifecycleAction; onCancel: (
   );
 }
 
-/** Closing, ending, reopening or deleting a record. Each asks why, for the Audit trail. */
-export function LifecycleCard({ title, text, actions }: LifecycleCardProps) {
+/**
+ * Closing, ending, reopening or deleting a record. Each asks why, for the Audit trail. Left out
+ * for a Member whose role allows none of the actions.
+ */
+export function LifecycleCard({ title, text, actions: offered }: LifecycleCardProps) {
   const [chosen, setChosen] = useState<LifecycleAction | null>(null);
+  const { canEdit, canConfirm } = usePermissions();
+  const actions = offered.filter((action) => canEdit || (action.reviewers && canConfirm));
+  if (!canEdit && actions.length === 0) return null;
 
   return (
     <Card aria-label={title} className="flex flex-col gap-3">

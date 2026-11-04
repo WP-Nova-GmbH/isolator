@@ -75,6 +75,7 @@ export type AuditAction =
   | 'member.invitation_revoked'
   | 'member.joined'
   | 'member.removed'
+  | 'member.role_changed'
   | 'organization.renamed'
   | 'task.added'
   | 'task.committed'

@@ -40,7 +40,14 @@ async function addMember(organizationId: string, name: string): Promise<CurrentM
     .values({ name, email: `${randomUUID()}@example.com` })
     .returning();
   const [member] = await db.insert(members).values({ organizationId, userId: user.id }).returning();
-  return { id: member.id, organizationId, organizationName: 'Test', name, email: user.email };
+  return {
+    id: member.id,
+    organizationId,
+    organizationName: 'Test',
+    name,
+    email: user.email,
+    role: member.role,
+  };
 }
 
 async function organization() {

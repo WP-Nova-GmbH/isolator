@@ -13,6 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { api } from '@/lib/api';
+import { usePermissions } from '@/lib/members';
 import type { Incident } from '@/lib/incidents';
 
 const tabs = [
@@ -27,6 +28,7 @@ export function incidentsLoader({ request }: LoaderFunctionArgs) {
 }
 
 export function Incidents() {
+  const { canEdit } = usePermissions();
   const incidents = useLoaderData<typeof incidentsLoader>();
   const { items } = useTabFilter(tabs);
 
@@ -36,9 +38,11 @@ export function Incidents() {
         title="Incidents"
         description="Security events that happened, and how you handled them."
         actions={
-          <Button asChild>
-            <Link to="/incidents/new">Report incident</Link>
-          </Button>
+          canEdit && (
+            <Button asChild>
+              <Link to="/incidents/new">Report incident</Link>
+            </Button>
+          )
         }
       />
       <TabNav label="Incident filter" items={items} />

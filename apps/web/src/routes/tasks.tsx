@@ -8,7 +8,7 @@ import { TasksTable } from '@/components/tasks-table';
 import { Button } from '@/components/ui/button';
 import { api, attempt } from '@/lib/api';
 import type { Incident } from '@/lib/incidents';
-import { useAppData } from '@/lib/members';
+import { useAppData, usePermissions } from '@/lib/members';
 import type { Nonconformity } from '@/lib/nonconformities';
 import { toTask, type ApiTask, type Risk } from '@/lib/risks';
 import type { SoaEntry } from '@/lib/soa';

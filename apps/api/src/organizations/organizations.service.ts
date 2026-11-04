@@ -61,7 +61,14 @@ export class OrganizationsService {
     requireOperator(user);
     return this.db.transaction(async (tx) => {
       const [organization] = await tx.insert(organizations).values({ name }).returning();
-      const { token } = await this.invitations.create(tx, organization.id, user.name, email);
+      // Whoever runs its ISMS administers it.
+      const { token } = await this.invitations.create(
+        tx,
+        organization.id,
+        user.name,
+        email,
+        'administrator',
+      );
       return { id: organization.id, token };
     });
   }
@@ -73,7 +80,13 @@ export class OrganizationsService {
       .from(organizations)
       .where(eq(organizations.id, organizationId));
     if (!organization) throw new NotFoundException('That Organization doesn’t exist.');
-    const { token } = await this.invitations.create(this.db, organizationId, user.name, email);
+    const { token } = await this.invitations.create(
+      this.db,
+      organizationId,
+      user.name,
+      email,
+      'administrator',
+    );
     return { token };
   }
 

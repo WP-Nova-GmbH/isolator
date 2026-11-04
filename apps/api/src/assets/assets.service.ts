@@ -11,7 +11,7 @@ import { AuditTrailService, recordEvent } from '../audit/audit-trail';
 import { DB, type Database } from '../db/db.module';
 import { assets, members, riskAssets, risks, suppliers, users } from '../db/schema';
 import type { CurrentMember } from '../members/current-member';
-import { isActiveMember, optionalOwnerNameOf, ownerOnReturn } from '../members/owner-name';
+import { canOwn, optionalOwnerNameOf, ownerOnReturn } from '../members/owner-name';
 import { formatRiskRef } from '../risks/risk-decision';
 import { formatSupplierRef } from '../suppliers/supplier-rules';
 import { SuppliersService } from '../suppliers/suppliers.service';
@@ -211,7 +211,7 @@ export class AssetsService {
     // A technical owner who has left is no longer assigned.
     const technicalLeft =
       row.asset.technicalOwnerId !== null &&
-      !(await isActiveMember(this.db, organizationId, row.asset.technicalOwnerId));
+      !(await canOwn(this.db, organizationId, row.asset.technicalOwnerId));
     const change = technicalLeft
       ? {
           before: { ...owner.change.before, technicalOwnerName: row.technicalOwnerName },

@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  AdministratorsOnly,
   Member,
   MemberGuard,
   User,
@@ -86,12 +87,15 @@ export class OrganizationsController {
 
   @Post('invitations')
   @UseGuards(MemberGuard)
+  @AdministratorsOnly()
   invite(@Member() member: CurrentMember, @Body() body: unknown) {
-    return this.invitations.invite(member, parseBody(invitationInput, body).email);
+    const { email, role } = parseBody(invitationInput, body);
+    return this.invitations.invite(member, email, role);
   }
 
   @Delete('invitations/:id')
   @UseGuards(MemberGuard)
+  @AdministratorsOnly()
   @HttpCode(204)
   revoke(@Member() member: CurrentMember, @Param('id', ParseUUIDPipe) id: string) {
     return this.invitations.revoke(member, id);

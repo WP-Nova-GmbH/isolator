@@ -34,15 +34,22 @@ const ORGANIZATION = 'WP Nova';
 
 // Anna claimed this install, so she is its Operator. On a Clerk development instance these are
 // test addresses: they receive no email, and 424242 is their verification code.
-const people = [
+const people: {
+  name: string;
+  email: string;
+  joined: string;
+  role: 'administrator' | 'editor' | 'reviewer' | 'auditor';
+  isOperator?: boolean;
+}[] = [
   {
     name: 'Anna Keller',
     email: 'anna+clerk_test@example.com',
     joined: '2026-07-01',
+    role: 'administrator',
     isOperator: true,
   },
-  { name: 'Jonas Weber', email: 'jonas+clerk_test@example.com', joined: '2026-07-03' },
-  { name: 'Lea Fischer', email: 'lea+clerk_test@example.com', joined: '2026-08-12' },
+  { name: 'Jonas Weber', email: 'jonas+clerk_test@example.com', joined: '2026-07-03', role: 'editor' },
+  { name: 'Lea Fischer', email: 'lea+clerk_test@example.com', joined: '2026-08-12', role: 'editor' },
 ];
 
 const sampleSuppliers = [

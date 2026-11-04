@@ -11,7 +11,12 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { Member, MemberGuard, type CurrentMember } from '../members/current-member';
+import {
+  Member,
+  MemberGuard,
+  ReviewersAllowed,
+  type CurrentMember,
+} from '../members/current-member';
 import { parseBody, reasonInput } from '../validation';
 import { documentFileInput, documentInput, DocumentsService } from './documents.service';
 
@@ -62,6 +67,7 @@ export class DocumentsController {
   }
 
   @Post(':id/confirmations')
+  @ReviewersAllowed()
   confirm(@Member() member: CurrentMember, @Param('id', ParseUUIDPipe) id: string) {
     return this.documents.confirm(member, id);
   }

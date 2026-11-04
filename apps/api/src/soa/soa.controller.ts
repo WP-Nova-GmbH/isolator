@@ -12,7 +12,12 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { Member, MemberGuard, type CurrentMember } from '../members/current-member';
+import {
+  Member,
+  MemberGuard,
+  ReviewersAllowed,
+  type CurrentMember,
+} from '../members/current-member';
 import { parseBody } from '../validation';
 import { evidenceInput, EvidenceService } from './evidence.service';
 import { ownControlInput, soaEntryInput, SoaService } from './soa.service';
@@ -46,6 +51,7 @@ export class SoaController {
   }
 
   @Post(':ref/confirmations')
+  @ReviewersAllowed()
   confirm(@Member() member: CurrentMember, @Param('ref') ref: string) {
     return this.soa.confirm(member, ref);
   }

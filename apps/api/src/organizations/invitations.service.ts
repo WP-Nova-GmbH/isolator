@@ -11,12 +11,14 @@ import { z } from 'zod';
 import { recordEvent } from '../audit/audit-trail';
 import { DB, type Database } from '../db/db.module';
 import { invitations, members, organizations, sessions, users } from '../db/schema';
-import type { CurrentMember, CurrentUser } from '../members/current-member';
+import type { CurrentMember, CurrentUser, Role } from '../members/current-member';
+import { roles } from '../members/members.service';
 
 const VALID_FOR_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const invitationInput = z.object({
   email: z.email('That isn’t an email address.').toLowerCase(),
+  role: z.enum(roles, 'Choose a role.').default('editor'),
 });
 
 function hashToken(token: string) {
@@ -34,6 +36,7 @@ export class InvitationsService {
       .select({
         id: invitations.id,
         email: invitations.email,
+        role: invitations.role,
         invitedBy: invitations.invitedByName,
         expiresAt: invitations.expiresAt,
       })
@@ -54,6 +57,7 @@ export class InvitationsService {
     organizationId: string,
     invitedByName: string,
     email: string,
+    role: Role,
   ) {
     const [existing] = await db
       .select({ id: members.id })
@@ -72,6 +76,7 @@ export class InvitationsService {
     const values = {
       organizationId,
       email,
+      role,
       invitedByName,
       tokenHash: hashToken(token),
       expiresAt: new Date(Date.now() + VALID_FOR_MS),
@@ -88,14 +93,15 @@ export class InvitationsService {
     return { id: invitation.id, token };
   }
 
-  invite(member: CurrentMember, email: string) {
+  invite(member: CurrentMember, email: string, role: Role) {
     return this.db.transaction(async (tx) => {
-      const invitation = await this.create(tx, member.organizationId, member.name, email);
+      const invitation = await this.create(tx, member.organizationId, member.name, email, role);
       await recordEvent(tx, member, {
         action: 'member.invited',
         recordType: 'member',
         recordId: invitation.id,
         recordLabel: email,
+        after: { role },
       });
       return invitation;
     });
@@ -154,6 +160,7 @@ export class InvitationsService {
         organizationId: invitations.organizationId,
         organizationName: organizations.name,
         email: invitations.email,
+        role: invitations.role,
         invitedByName: invitations.invitedByName,
       })
       .from(invitations)
@@ -179,10 +186,10 @@ export class InvitationsService {
     const { organizationId } = invitation;
     const [member] = await tx
       .insert(members)
-      .values({ organizationId, userId: user.id })
+      .values({ organizationId, userId: user.id, role: invitation.role })
       .onConflictDoUpdate({
         target: [members.organizationId, members.userId],
-        set: { removedAt: null, removedReason: null },
+        set: { removedAt: null, removedReason: null, role: invitation.role },
       })
       .returning({ id: members.id });
     await tx
@@ -196,7 +203,7 @@ export class InvitationsService {
       recordType: 'member',
       recordId: member.id,
       recordLabel: user.name,
-      after: { email: user.email, invitedBy: invitation.invitedByName },
+      after: { email: user.email, invitedBy: invitation.invitedByName, role: invitation.role },
     });
   }
 }

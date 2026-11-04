@@ -19,6 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { api, attempt } from '@/lib/api';
+import { usePermissions } from '@/lib/members';
 import { controlState, type SoaEntry } from '@/lib/soa';
 import { useFormFetcher } from '@/lib/use-form-fetcher';
 
@@ -80,6 +81,7 @@ function OwnControlForm({ onClose }: { onClose: () => void }) {
 }
 
 export function Soa() {
+  const { canEdit } = usePermissions();
   const all = useLoaderData<typeof soaLoader>();
   const { value, items } = useTabFilter(tabs);
   const [adding, setAdding] = useState(false);
@@ -91,9 +93,11 @@ export function Soa() {
         title="Statement of Applicability"
         description="One entry per control, including your own."
         actions={
-          <Button type="button" variant="outline" onClick={() => setAdding(true)}>
-            Add own control
-          </Button>
+          canEdit && (
+            <Button type="button" variant="outline" onClick={() => setAdding(true)}>
+              Add own control
+            </Button>
+          )
         }
       />
       {adding && <OwnControlForm onClose={() => setAdding(false)} />}

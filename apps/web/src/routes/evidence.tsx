@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/page-header';
 import { StatGrid, StatTile } from '@/components/stat-tile';
 import { Button } from '@/components/ui/button';
 import { api, attempt } from '@/lib/api';
+import { usePermissions } from '@/lib/members';
 import type { IsmsDocument } from '@/lib/documents';
 import { addEvidence, type EvidenceItem, type SoaEntry } from '@/lib/soa';
 
@@ -29,6 +30,7 @@ export async function evidenceAction({ request }: ActionFunctionArgs) {
 }
 
 export function Evidence() {
+  const { canEdit } = usePermissions();
   const { evidence, entries, documents } = useLoaderData<typeof evidenceLoader>();
   const result = useActionData<typeof evidenceAction>();
   const [adding, setAdding] = useState(false);
@@ -39,9 +41,11 @@ export function Evidence() {
         title="Evidence"
         description="Dated proof that your controls are working, attached to SoA entries."
         actions={
-          <Button type="button" onClick={() => setAdding(true)}>
-            Add Evidence
-          </Button>
+          canEdit && (
+            <Button type="button" onClick={() => setAdding(true)}>
+              Add Evidence
+            </Button>
+          )
         }
       />
       <FormError message={result?.error} />

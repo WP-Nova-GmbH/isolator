@@ -26,6 +26,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { api, attempt } from '@/lib/api';
 import { historyItems } from '@/lib/audit';
+import { usePermissions } from '@/lib/members';
 import {
   documentKindLabels,
   documentPayload,
@@ -55,8 +56,9 @@ export async function documentDetailAction({ request, params }: ActionFunctionAr
       case 'save':
         return api(path, { method: 'PUT', body: documentPayload(form) });
       case 'confirm':
-        // Saves first, so what is on screen is what gets confirmed.
-        await api(path, { method: 'PUT', body: documentPayload(form) });
+        // Saves first, so what is on screen is what gets confirmed. A Reviewer's form is locked
+        // and sends no fields, so there is nothing to save.
+        if (form.has('title')) await api(path, { method: 'PUT', body: documentPayload(form) });
         return api(`${path}/confirmations`, { method: 'POST' });
       case 'start-version':
         return api(`${path}/versions`, { method: 'POST' });
@@ -196,6 +198,8 @@ export function DocumentDetail() {
   const navigation = useNavigation();
   const withdrawn = doc.withdrawnAt !== null;
   const draft = doc.state === 'Draft';
+  const { canEdit } = usePermissions();
+  const locked = withdrawn || !canEdit;
 
   return (
     <>
@@ -221,7 +225,7 @@ export function DocumentDetail() {
         aside={
           <>
             {!withdrawn && <ConfirmationCard {...confirmationProps(doc)} />}
-            {!withdrawn && !draft && (
+            {!locked && !draft && (
               <Form method="post">
                 <Button
                   type="submit"
@@ -272,10 +276,10 @@ export function DocumentDetail() {
         }
       >
         <Form id="document-form" method="post" className="flex flex-col gap-6">
-          <fieldset disabled={withdrawn} className="contents">
+          <fieldset disabled={locked} className="contents">
             <DocumentFields key={doc.version} document={doc} contentLocked={!draft} />
           </fieldset>
-          {!withdrawn && (
+          {!locked && (
             <div>
               <Button
                 type="submit"
@@ -289,7 +293,7 @@ export function DocumentDetail() {
             </div>
           )}
         </Form>
-        <FileCard doc={doc} editable={draft && !withdrawn} />
+        <FileCard doc={doc} editable={draft && !locked} />
       </DetailLayout>
     </>
   );

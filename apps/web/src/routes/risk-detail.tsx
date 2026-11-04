@@ -26,7 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { api, attempt } from '@/lib/api';
 import { historyItems } from '@/lib/audit';
-import { useAppData } from '@/lib/members';
+import { useAppData, usePermissions } from '@/lib/members';
 import { taskIntent } from '@/lib/tasks';
 import {
   riskPayload,
@@ -69,8 +69,9 @@ export async function riskDetailAction({ request, params }: ActionFunctionArgs) 
       case 'save':
         return api(path, { method: 'PUT', body: riskPayload(form) });
       case 'confirm':
-        // Saves first, so what is on screen is what gets confirmed.
-        await api(path, { method: 'PUT', body: riskPayload(form) });
+        // Saves first, so what is on screen is what gets confirmed. A Reviewer's form is locked
+        // and sends no fields, so there is nothing to save.
+        if (form.has('title')) await api(path, { method: 'PUT', body: riskPayload(form) });
         return api(`${path}/confirmations`, { method: 'POST' });
       case 'close':
         return api(`${path}/closure`, { method: 'POST', body: { reason } });
@@ -138,6 +139,7 @@ function lifecycleProps(risk: Risk, isOwner: boolean) {
       intent: 'close',
       label: 'Close risk',
       prompt: 'Why does this risk no longer apply?',
+      reviewers: true,
     });
   }
   if (!risk.everConfirmed) {
@@ -164,6 +166,8 @@ export function RiskDetail() {
   const navigation = useNavigation();
   const [addingTask, setAddingTask] = useState(false);
   const closed = risk.closedAt !== null;
+  const { canEdit } = usePermissions();
+  const locked = closed || !canEdit;
 
   const linkedAssets = new Set(risk.assets.map((asset) => asset.id));
   const linkedControls = new Set(risk.controls.map((control) => control.id));
@@ -206,10 +210,10 @@ export function RiskDetail() {
         }
       >
         <Form id="risk-form" method="post" className="flex flex-col gap-6">
-          <fieldset disabled={closed} className="contents">
+          <fieldset disabled={locked} className="contents">
             <RiskFields key={risk.ref} risk={risk} />
           </fieldset>
-          {!closed && (
+          {!locked && (
             <div>
               <Button
                 type="submit"
@@ -226,7 +230,7 @@ export function RiskDetail() {
 
         <section className="flex flex-col gap-3">
           <SectionHeader title="Treatment Tasks">
-            {!closed && (
+            {!locked && (
               <Button type="button" variant="outline" onClick={() => setAddingTask(true)}>
                 New Task
               </Button>

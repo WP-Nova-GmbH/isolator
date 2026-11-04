@@ -13,6 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { api } from '@/lib/api';
+import { usePermissions } from '@/lib/members';
 import type { Nonconformity } from '@/lib/nonconformities';
 
 const tabs = [
@@ -27,6 +28,7 @@ export function nonconformitiesLoader({ request }: LoaderFunctionArgs) {
 }
 
 export function Nonconformities() {
+  const { canEdit } = usePermissions();
   const nonconformities = useLoaderData<typeof nonconformitiesLoader>();
   const { items } = useTabFilter(tabs);
 
@@ -36,9 +38,11 @@ export function Nonconformities() {
         title="Nonconformities"
         description="Where the ISMS falls short, and the Tasks that correct it."
         actions={
-          <Button asChild>
-            <Link to="/nonconformities/new">Add Nonconformity</Link>
-          </Button>
+          canEdit && (
+            <Button asChild>
+              <Link to="/nonconformities/new">Add Nonconformity</Link>
+            </Button>
+          )
         }
       />
       <TabNav label="Nonconformity filter" items={items} />

@@ -21,6 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { api, attempt } from '@/lib/api';
+import { usePermissions } from '@/lib/members';
 import type { Risk, RiskAssessmentList } from '@/lib/risks';
 
 export async function riskAssessmentsLoader() {
@@ -41,6 +42,7 @@ export async function riskAssessmentsAction({ request }: ActionFunctionArgs) {
 }
 
 export function RiskAssessments() {
+  const { canEdit } = usePermissions();
   const { assessments, nextDue, risks } = useLoaderData<typeof riskAssessmentsLoader>();
   const result = useActionData<typeof riskAssessmentsAction>();
   const navigation = useNavigation();
@@ -54,17 +56,19 @@ export function RiskAssessments() {
         title="Risks"
         description="Each Risk assessment preserves the register as it stood on that date."
         actions={
-          <Form method="post">
-            {inProgress && <input type="hidden" name="id" value={inProgress.id} />}
-            <Button
-              type="submit"
-              name="intent"
-              value={inProgress ? 'complete' : 'start'}
-              disabled={busy || (inProgress && (unconfirmed > 0 || risks.length === 0))}
-            >
-              {inProgress ? 'Complete Risk assessment' : 'Start Risk assessment'}
-            </Button>
-          </Form>
+          canEdit && (
+            <Form method="post">
+              {inProgress && <input type="hidden" name="id" value={inProgress.id} />}
+              <Button
+                type="submit"
+                name="intent"
+                value={inProgress ? 'complete' : 'start'}
+                disabled={busy || (inProgress && (unconfirmed > 0 || risks.length === 0))}
+              >
+                {inProgress ? 'Complete Risk assessment' : 'Start Risk assessment'}
+              </Button>
+            </Form>
+          )
         }
       />
       <RiskTabs />

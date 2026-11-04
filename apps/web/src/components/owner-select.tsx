@@ -23,11 +23,14 @@ export function OwnerSelect({ defaultValue, unassigned, ...props }: OwnerSelectP
   return (
     <NativeSelect defaultValue={defaultValue ?? ''} {...props}>
       {unassigned && <option value="">{UNASSIGNED}</option>}
-      {members.map((member) => (
-        <option key={member.id} value={member.id}>
-          {member.name}
-        </option>
-      ))}
+      {members
+        // An Auditor only reads, so owns nothing.
+        .filter((member) => member.role !== 'auditor')
+        .map((member) => (
+          <option key={member.id} value={member.id}>
+            {member.name}
+          </option>
+        ))}
     </NativeSelect>
   );
 }

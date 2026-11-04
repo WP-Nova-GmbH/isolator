@@ -21,6 +21,7 @@ import { Card } from '@/components/ui/card';
 import { api, attempt } from '@/lib/api';
 import { assetPayload, type AssetDetail as Asset } from '@/lib/assets';
 import { historyItems } from '@/lib/audit';
+import { usePermissions } from '@/lib/members';
 import type { Supplier } from '@/lib/suppliers';
 
 export async function assetDetailLoader({ params }: LoaderFunctionArgs) {
@@ -94,6 +95,8 @@ export function AssetDetail() {
   const result = useActionData<typeof assetDetailAction>();
   const navigation = useNavigation();
   const retired = asset.retiredAt !== null;
+  const { canEdit } = usePermissions();
+  const locked = retired || !canEdit;
 
   return (
     <>
@@ -118,10 +121,10 @@ export function AssetDetail() {
         }
       >
         <Form method="post" className="flex flex-col gap-6">
-          <fieldset disabled={retired} className="contents">
+          <fieldset disabled={locked} className="contents">
             <AssetFields key={asset.id} asset={asset} suppliers={suppliers} />
           </fieldset>
-          {!retired && (
+          {!locked && (
             <div>
               <Button
                 type="submit"

@@ -12,7 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { api } from '@/lib/api';
-import { useAppData } from '@/lib/members';
+import { useAppData, usePermissions } from '@/lib/members';
 import { contractEndLabel, criticalityLabels, type Supplier } from '@/lib/suppliers';
 import { UNASSIGNED, UNKNOWN } from '@/components/owner-select';
 
@@ -25,6 +25,7 @@ export async function suppliersLoader() {
 }
 
 export function Suppliers() {
+  const { canEdit } = usePermissions();
   const { suppliers, ended } = useLoaderData<typeof suppliersLoader>();
   const { me } = useAppData();
   const needsAttention = suppliers.filter((supplier) => supplier.attention.length > 0);
@@ -35,9 +36,11 @@ export function Suppliers() {
         title="Suppliers"
         description={`Outside companies ${me.organizationName} relies on, and the assets each one provides.`}
         actions={
-          <Button asChild>
-            <Link to="/suppliers/new">Add Supplier</Link>
-          </Button>
+          canEdit && (
+            <Button asChild>
+              <Link to="/suppliers/new">Add Supplier</Link>
+            </Button>
+          )
         }
       />
 

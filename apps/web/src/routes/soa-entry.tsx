@@ -13,6 +13,7 @@ import { EvidenceForm } from '@/components/evidence-form';
 import { EvidenceTable } from '@/components/evidence-table';
 import { Field, FieldGrid } from '@/components/field';
 import { FormError } from '@/components/form-error';
+import { OwnerSelect } from '@/components/owner-select';
 import { HistoryList } from '@/components/history-list';
 import { NewTaskForm } from '@/components/new-task-form';
 import { PageHeader, SectionHeader } from '@/components/page-header';
@@ -27,7 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { api, attempt } from '@/lib/api';
 import { historyItems } from '@/lib/audit';
 import type { IsmsDocument } from '@/lib/documents';
-import { useAppData } from '@/lib/members';
+import { usePermissions } from '@/lib/members';
 import { currentScore, toTask, type ApiTask } from '@/lib/risks';
 import {
   addEvidence,
@@ -88,7 +89,7 @@ function confirmationProps(entry: SoaEntryDetail) {
 
 export function SoaEntry() {
   const { entry, evidence, tasks, documents } = useLoaderData<typeof soaEntryLoader>();
-  const { members } = useAppData();
+  const { canEdit } = usePermissions();
   const result = useActionData<typeof soaEntryAction>();
   const navigation = useNavigation();
   const [adding, setAdding] = useState<'evidence' | 'task' | null>(null);
@@ -177,52 +178,30 @@ export function SoaEntry() {
                   defaultValue={entry.justification}
                 />
               </Field>
-              <Field label="Implementation status" htmlFor="status">
-                <NativeSelect id="status" name="status" defaultValue={entry.status}>
-                  {Object.entries(statusLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </Field>
-              <Field label="Owner" htmlFor="ownerId">
-                <NativeSelect id="ownerId" name="ownerId" defaultValue={entry.ownerId ?? ''}>
-                  <option value="">None</option>
-                  {members.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.name}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </Field>
-            </FieldGrid>
-            <Field label="Justification" htmlFor="justification">
-              <Textarea
-                id="justification"
-                name="justification"
-                defaultValue={entry.justification}
-              />
-            </Field>
-          </Card>
-          <div>
-            <Button
-              type="submit"
-              name="intent"
-              value="save"
-              variant="outline"
-              disabled={navigation.state !== 'idle'}
-            >
-              Save changes
-            </Button>
-          </div>
+            </Card>
+          </fieldset>
+          {canEdit && (
+            <div>
+              <Button
+                type="submit"
+                name="intent"
+                value="save"
+                variant="outline"
+                disabled={navigation.state !== 'idle'}
+              >
+                Save changes
+              </Button>
+            </div>
+          )}
         </Form>
 
         <section className="flex flex-col gap-3">
           <SectionHeader title="Evidence">
-            <Button type="button" variant="outline" onClick={() => setAdding('evidence')}>
-              Add Evidence
-            </Button>
+            {canEdit && (
+              <Button type="button" variant="outline" onClick={() => setAdding('evidence')}>
+                Add Evidence
+              </Button>
+            )}
           </SectionHeader>
           {adding === 'evidence' && (
             <EvidenceForm documents={documents} onClose={() => setAdding(null)} />
@@ -232,9 +211,11 @@ export function SoaEntry() {
 
         <section className="flex flex-col gap-3">
           <SectionHeader title="Tasks">
-            <Button type="button" variant="outline" onClick={() => setAdding('task')}>
-              New Task
-            </Button>
+            {canEdit && (
+              <Button type="button" variant="outline" onClick={() => setAdding('task')}>
+                New Task
+              </Button>
+            )}
           </SectionHeader>
           {adding === 'task' && <NewTaskForm onClose={() => setAdding(null)} />}
           <TasksTable tasks={tasks} canFinish emptyText="No Tasks yet." />

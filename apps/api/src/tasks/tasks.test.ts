@@ -33,8 +33,18 @@ async function addMember(organizationId: string, name: string): Promise<CurrentM
     .insert(users)
     .values({ name, email: `${randomUUID()}@example.com` })
     .returning();
-  const [member] = await db.insert(members).values({ organizationId, userId: user.id }).returning();
-  return { id: member.id, organizationId, organizationName: 'Test', name, email: user.email };
+  const [member] = await db
+    .insert(members)
+    .values({ organizationId, userId: user.id, role: 'editor' })
+    .returning();
+  return {
+    id: member.id,
+    organizationId,
+    organizationName: 'Test',
+    name,
+    email: user.email,
+    role: 'editor',
+  };
 }
 
 async function withRisk() {

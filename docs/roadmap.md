@@ -10,6 +10,7 @@ Isolator has to carry an ISMS from nothing to a certificate and beyond. The phas
 - [x] File storage: on local disk, or in S3 when configured
 - [x] Claiming an install, sign-in and invitations (Clerk)
 - [x] Organizations and Members: creating, inviting, switching and removing
+- [x] Roles: Administrator, Editor, Reviewer and Auditor
 - [x] Tenancy fixes: `organization_id` on `risk_controls`, no references across Organizations
 - [ ] German, English and French interface, with our own control titles
 - [x] Confirmations for risks, SoA entries and Document versions

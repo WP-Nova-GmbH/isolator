@@ -1,12 +1,20 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { ExecutionContext } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { eq } from 'drizzle-orm';
 import type { Auth, AuthSession, Person } from '../auth/auth';
 import { createDb } from '../db/client';
 import { members, organizations, sessions, users } from '../db/schema';
 import { testDatabaseUrl } from '../test/database';
-import { MemberGuard, UserGuard, type CurrentMember, type CurrentUser } from './current-member';
+import {
+  AllowedFor,
+  MemberGuard,
+  UserGuard,
+  type CurrentMember,
+  type CurrentUser,
+  type Role,
+} from './current-member';
 
 const { db, client } = createDb(testDatabaseUrl());
 const signedIn = new Map<string, AuthSession>();
@@ -15,23 +23,34 @@ const auth: Auth = {
   session: async (authorization) => signedIn.get(authorization ?? '') ?? null,
   person: async (clerkUserId) => people.get(clerkUserId)!,
 };
-const memberGuard = new MemberGuard(auth, db);
+const memberGuard = new MemberGuard(auth, db, new Reflector());
 const userGuard = new UserGuard(auth, db);
 
 afterAll(() => client.end());
 
 interface TestRequest {
+  method: string;
   headers: { authorization?: string };
   member?: CurrentMember;
   user?: CurrentUser;
 }
 
-function requestWith(authorization?: string) {
-  const request: TestRequest = { headers: { authorization } };
+/** A request to a route. `handler` stands in for the controller method, with its decorators. */
+function requestWith(authorization?: string, method = 'GET', handler: () => void = () => {}) {
+  const request: TestRequest = { method, headers: { authorization } };
   const context = {
     switchToHttp: () => ({ getRequest: () => request }),
+    getHandler: () => handler,
+    getClass: () => class {},
   } as unknown as ExecutionContext;
   return { request, context };
+}
+
+/** A route method carrying @AllowedFor(...roles). */
+function routeFor(...roles: Role[]) {
+  const route = () => {};
+  AllowedFor(...roles)(route, 'route', { value: route });
+  return route;
 }
 
 function email() {
@@ -53,13 +72,22 @@ async function signedInUser(authorization: string) {
   return request.user!;
 }
 
-async function join(userId: string, name = 'Test') {
+async function join(userId: string, name = 'Test', role: Role = 'editor') {
   const [organization] = await db.insert(organizations).values({ name }).returning();
   const [member] = await db
     .insert(members)
-    .values({ organizationId: organization.id, userId })
+    .values({ organizationId: organization.id, userId, role })
     .returning();
   return member;
+}
+
+/** A signed-in Member with a role, and a way to make requests as them. */
+async function memberWith(role: Role) {
+  const authorization = signIn();
+  const user = await signedInUser(authorization);
+  await join(user.id, 'Test', role);
+  return (method: string, handler?: () => void) =>
+    memberGuard.canActivate(requestWith(authorization, method, handler).context);
 }
 
 describe('MemberGuard', () => {
@@ -142,6 +170,48 @@ describe('MemberGuard', () => {
   it('refuses someone signed in who belongs to no Organization', async () => {
     const { context } = requestWith(signIn());
     await expect(memberGuard.canActivate(context)).rejects.toThrow('not a Member');
+  });
+});
+
+describe('roles', () => {
+  it('let every Member read', async () => {
+    for (const role of ['administrator', 'editor', 'reviewer', 'auditor'] as const) {
+      await expect((await memberWith(role))('GET')).resolves.toBe(true);
+    }
+  });
+
+  it('let Administrators and Editors change records, and nobody else', async () => {
+    await expect((await memberWith('administrator'))('POST')).resolves.toBe(true);
+    await expect((await memberWith('editor'))('PUT')).resolves.toBe(true);
+    await expect((await memberWith('reviewer'))('PUT')).rejects.toThrow(
+      'As a Reviewer you can give Confirmations, but not change records.',
+    );
+    await expect((await memberWith('auditor'))('DELETE')).rejects.toThrow(
+      'As an Auditor you can read this ISMS, but not change it.',
+    );
+  });
+
+  it('let Reviewers give Confirmations, but never Auditors', async () => {
+    const confirmation = routeFor('administrator', 'editor', 'reviewer');
+    await expect((await memberWith('reviewer'))('POST', confirmation)).resolves.toBe(true);
+    await expect((await memberWith('auditor'))('POST', confirmation)).rejects.toThrow('Auditor');
+  });
+
+  it('keep managing Members to Administrators', async () => {
+    const administration = routeFor('administrator');
+    await expect((await memberWith('administrator'))('POST', administration)).resolves.toBe(true);
+    await expect((await memberWith('editor'))('POST', administration)).rejects.toThrow(
+      'Only an Administrator can do this.',
+    );
+  });
+
+  it('put the role on the Member', async () => {
+    const authorization = signIn();
+    const user = await signedInUser(authorization);
+    await join(user.id, 'Test', 'reviewer');
+    const { request, context } = requestWith(authorization);
+    await memberGuard.canActivate(context);
+    expect(request.member?.role).toBe('reviewer');
   });
 });
 

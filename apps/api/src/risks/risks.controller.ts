@@ -13,7 +13,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { z } from 'zod';
-import { Member, MemberGuard, type CurrentMember } from '../members/current-member';
+import {
+  Member,
+  MemberGuard,
+  ReviewersAllowed,
+  type CurrentMember,
+} from '../members/current-member';
 import { parseBody, reasonInput } from '../validation';
 import { RiskAssessmentsService } from './risk-assessments.service';
 import { riskCriteriaInput, RiskCriteriaService } from './risk-criteria.service';
@@ -47,16 +52,19 @@ export class RisksController {
   }
 
   @Post(':ref/confirmations')
+  @ReviewersAllowed()
   confirm(@Member() member: CurrentMember, @Param('ref') ref: string) {
     return this.risks.confirm(member, ref);
   }
 
   @Post(':ref/closure')
+  @ReviewersAllowed()
   close(@Member() member: CurrentMember, @Param('ref') ref: string, @Body() body: unknown) {
     return this.risks.close(member, ref, parseBody(reasonInput, body).reason);
   }
 
   @Post(':ref/reopening')
+  @ReviewersAllowed()
   reopen(@Member() member: CurrentMember, @Param('ref') ref: string, @Body() body: unknown) {
     return this.risks.reopen(member, ref, parseBody(reasonInput, body).reason);
   }

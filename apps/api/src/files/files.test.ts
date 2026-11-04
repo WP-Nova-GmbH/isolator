@@ -41,6 +41,7 @@ async function member(): Promise<CurrentMember> {
     organizationName: 'Test',
     name: 'Owner',
     email: user.email,
+    role: row.role,
   };
 }
 

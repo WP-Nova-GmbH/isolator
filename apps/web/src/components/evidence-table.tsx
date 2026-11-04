@@ -74,7 +74,7 @@ export function EvidenceTable({ items, showControl = false }: EvidenceTableProps
           <TableHead>Expires</TableHead>
           {showControl && <TableHead>Added by</TableHead>}
           <TableHead>State</TableHead>
-          <TableHead className="sr-only">Actions</TableHead>
+          {canEdit && <TableHead className="sr-only">Actions</TableHead>}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -97,9 +97,11 @@ export function EvidenceTable({ items, showControl = false }: EvidenceTableProps
             <TableCell>
               <StateBadge kind="evidence" state={item.state} />
             </TableCell>
-            <TableCell className="py-0">
-              <RemoveEvidence item={item} />
-            </TableCell>
+            {canEdit && (
+              <TableCell className="py-0">
+                <RemoveEvidence item={item} />
+              </TableCell>
+            )}
           </TableRow>
         ))}
         {items.length === 0 && (

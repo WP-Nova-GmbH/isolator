@@ -17,6 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { api } from '@/lib/api';
+import { usePermissions } from '@/lib/members';
 import {
   currentScore,
   residualScore,
@@ -52,6 +53,7 @@ function ResidualCell({ risk }: { risk: Risk }) {
 }
 
 export function Risks() {
+  const { canEdit } = usePermissions();
   const { risks, closed, criteria } = useLoaderData<typeof risksLoader>();
   const needsAttention = risks.filter((risk) => !risk.confirmation);
 
@@ -61,9 +63,11 @@ export function Risks() {
         title="Risks"
         description={`Risks above your acceptance threshold of ${criteria.acceptanceThreshold} need treatment.`}
         actions={
-          <Button asChild>
-            <Link to="/risks/new">Add risk</Link>
-          </Button>
+          canEdit && (
+            <Button asChild>
+              <Link to="/risks/new">Add risk</Link>
+            </Button>
+          )
         }
       />
       <RiskTabs />

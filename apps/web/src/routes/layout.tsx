@@ -33,7 +33,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { useAppData } from '@/lib/members';
+import { roleLabels, useAppData } from '@/lib/members';
 
 const navGroups = [
   {
@@ -118,9 +118,12 @@ function AppSidebar() {
         ))}
       </SidebarContent>
       <SidebarFooter className="gap-2 px-2.5 pb-3">
-        <div className="flex items-center gap-2 border-t pt-3 font-medium text-foreground">
+        <div className="flex items-center gap-2 border-t pt-3 text-foreground">
           <UserButton />
-          <span className="min-w-0 flex-1 truncate">{me.name}</span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate font-medium">{me.name}</span>
+            <span className="truncate text-xs text-muted-foreground">{roleLabels[me.role]}</span>
+          </span>
         </div>
         <label className="sr-only" htmlFor="language">
           Language
