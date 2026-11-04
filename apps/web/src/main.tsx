@@ -4,7 +4,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, type RouteObject } from 'react-router';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { api } from '@/lib/api';
+import { api, renewSessionOnReturn } from '@/lib/api';
 import { appLoader } from '@/lib/members';
 import './index.css';
 import {
@@ -223,6 +223,7 @@ async function start() {
       </ClerkProvider>
     </StrictMode>,
   );
+  renewSessionOnReturn();
 }
 
 void start();

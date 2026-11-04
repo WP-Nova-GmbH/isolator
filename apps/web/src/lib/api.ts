@@ -18,6 +18,29 @@ interface ApiRequest {
   signedOut?: boolean;
 }
 
+/** The first signs that someone is back after a pause; their click comes later. */
+const RETURN_EVENTS = ['pointermove', 'pointerdown', 'keydown', 'touchstart', 'focus', 'pageshow', 'online'];
+
+/**
+ * Clerk's session token lives 60 s and only renews while the tab is active, so after a pause
+ * (tab in the background, laptop asleep) the first request waits for a new one. This renews it
+ * as soon as the user is back, so their click doesn't wait. A still-valid token comes from
+ * Clerk's cache, and a request that comes first still waits for the token in apiResponse.
+ */
+export function renewSessionOnReturn() {
+  let last = 0;
+  const renew = () => {
+    // Pointer moves come in bursts: one renewal every few seconds is plenty.
+    if (document.visibilityState !== 'visible' || Date.now() - last < 5000) return;
+    last = Date.now();
+    void getToken().catch(() => null);
+  };
+  for (const type of RETURN_EVENTS) window.addEventListener(type, renew, { passive: true });
+  // Shown again, or unfrozen after the browser parked the tab.
+  document.addEventListener('visibilitychange', renew);
+  document.addEventListener('resume', renew);
+}
+
 /** The raw response, for anything that isn't JSON. Throws ApiError on a refusal. */
 export async function apiResponse(path: string, { method, body, signedOut }: ApiRequest = {}) {
   const isJson = body !== undefined && !(body instanceof FormData);
