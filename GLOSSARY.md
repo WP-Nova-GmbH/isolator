@@ -16,9 +16,9 @@
 
 **Statement of Applicability (SoA)** – per Organization, one entry per control, including its own, stating whether it applies, why, and its implementation status.
 
-**Asset** – something of value to the organization that needs protecting: information, software, hardware, services, people, sites.
+**Asset** – something of value to the organization that needs protecting: information, software, hardware, services, people, sites. It is planned or operational, and has a business owner, who is accountable for it, and a technical owner, who runs it; either can be unassigned and its classification unknown. Its record keeps its locations, its source (where the record came from, such as an inventory export) and whether it has been validated against the asset itself.
 
-**Supplier** – an outside company providing a product or service the Organization relies on. Service assets link to the Supplier that provides them.
+**Supplier** – an outside company providing a product or service the Organization relies on. Service assets link to the Supplier that provides them. Its owner can be unassigned, and its criticality, whether it handles personal data and its contract term (an end date, or rolling until notice) can be unknown; the Supplier lists what is still unknown as needing attention.
 
 **Supplier review** – a dated check of a Supplier by a Member, with an outcome and notes, that sets the next review date. A correction is a new review.
 
@@ -58,7 +58,7 @@
 
 **Finding** – a single result of a scan, which may raise or update a risk or count as evidence for a control.
 
-**Evidence** – a dated file or a link to a Document showing a control is operating (screenshot, scan result, log export), attached to an SoA entry. It has no versions and needs no Confirmation.
+**Evidence** – a file or a link to a Document showing a control is operating (screenshot, scan result, log export), attached to an SoA entry, with the date it carries if that is known. It has no versions and needs no Confirmation.
 
 **Document** – a versioned record the Organization maintains in its audit file, such as a policy, a security objective or a competence record. Each version needs a Confirmation, and the last confirmed version stays in force until a newer one is confirmed.
 

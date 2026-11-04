@@ -1,6 +1,7 @@
 import { XIcon } from 'lucide-react';
 import { Link, useFetcher } from 'react-router';
 import { DownloadButton } from '@/components/download-button';
+import { UNKNOWN } from '@/components/owner-select';
 import { StateBadge } from '@/components/state-badge';
 import { DataCell, EmptyRow, MainCell, Ref } from '@/components/table-parts';
 import { Button } from '@/components/ui/button';
@@ -88,7 +89,7 @@ export function EvidenceTable({ items, showControl = false }: EvidenceTableProps
               <EvidenceTitle item={item} />
             </MainCell>
             <TableCell>{item.kind}</TableCell>
-            <DataCell>{item.datedOn}</DataCell>
+            <DataCell>{item.datedOn ?? UNKNOWN}</DataCell>
             <DataCell>{item.expiresOn ?? 'None'}</DataCell>
             {showControl && <TableCell>{item.addedBy}</TableCell>}
             <TableCell>

@@ -5,25 +5,45 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { and, asc, count, eq, isNotNull, isNull, type SQL } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
 import { AuditTrailService, recordEvent } from '../audit/audit-trail';
 import { DB, type Database } from '../db/db.module';
 import { assets, members, riskAssets, risks, suppliers, users } from '../db/schema';
 import type { CurrentMember } from '../members/current-member';
-import { ownerNameOf, ownerOnReturn } from '../members/owner-name';
+import { isActiveMember, optionalOwnerNameOf, ownerOnReturn } from '../members/owner-name';
 import { formatRiskRef } from '../risks/risk-decision';
 import { formatSupplierRef } from '../suppliers/supplier-rules';
 import { SuppliersService } from '../suppliers/suppliers.service';
 
+// Null owners are unassigned, and a null classification is not known yet.
 export const assetInput = z.object({
   name: z.string().trim().min(1, 'Give the asset a name.'),
   type: z.enum(['information', 'software', 'hardware', 'service', 'people', 'site']),
-  classification: z.enum(['public', 'internal', 'confidential', 'strictly_confidential']),
-  ownerId: z.uuid('Choose an owner.'),
+  status: z.enum(['planned', 'operational']),
+  classification: z
+    .enum(['public', 'internal', 'confidential', 'strictly_confidential'])
+    .nullable(),
+  ownerId: z.uuid('Choose a business owner.').nullable(),
+  technicalOwnerId: z.uuid('Choose a technical owner.').nullable(),
+  location: z.string().trim(),
   supplierRef: z.string().nullable(),
+  validation: z.enum(['unvalidated', 'validated']),
+  source: z.string().trim(),
+  notes: z.string().trim(),
 });
 
 export type AssetInput = z.output<typeof assetInput>;
+
+type AssetRow = typeof assets.$inferSelect;
+
+const technicalMembers = alias(members, 'technical_members');
+const technicalUsers = alias(users, 'technical_users');
+
+interface OwnerNames {
+  ownerName: string | null;
+  technicalOwnerName: string | null;
+}
 
 @Injectable()
 export class AssetsService {
@@ -54,17 +74,9 @@ export class AssetsService {
       ).orderBy(asc(assets.name)),
       this.db.select().from(openRisks),
     ]);
-    return rows.map(({ asset, ownerName, supplierNumber, supplierName }) => ({
-      id: asset.id,
-      name: asset.name,
-      type: asset.type,
-      classification: asset.classification,
-      ownerId: asset.ownerId,
-      ownerName,
-      retiredAt: asset.retiredAt,
-      retiredReason: asset.retiredReason,
-      supplier: this.supplier(supplierNumber, supplierName),
-      risks: counts.find((count) => count.assetId === asset.id)?.risks ?? 0,
+    return rows.map((row) => ({
+      ...this.fields(row),
+      risks: counts.find((count) => count.assetId === row.asset.id)?.risks ?? 0,
     }));
   }
 
@@ -91,17 +103,9 @@ export class AssetsService {
         .where(and(eq(riskAssets.organizationId, organizationId), eq(riskAssets.assetId, id))),
     ]);
     return {
-      id,
-      name: row.asset.name,
-      type: row.asset.type,
-      classification: row.asset.classification,
-      ownerId: row.asset.ownerId,
-      ownerName: row.ownerName,
-      retiredAt: row.asset.retiredAt,
-      retiredReason: row.asset.retiredReason,
+      ...this.fields(row),
       // A risk points at it, even if that risk is closed, so it can only be retired.
       deletable: everLinked === 0,
-      supplier: this.supplier(row.supplierNumber, row.supplierName),
       risks: linkedRisks.map((risk) => ({ ref: formatRiskRef(risk.number), title: risk.title })),
       history,
     };
@@ -109,26 +113,19 @@ export class AssetsService {
 
   async create(member: CurrentMember, input: AssetInput) {
     const { organizationId } = member;
-    const ownerName = await ownerNameOf(this.db, organizationId, input.ownerId);
+    const names = await this.ownerNames(organizationId, input);
     const supplierId = await this.supplierId(organizationId, input.supplierRef);
     return this.db.transaction(async (tx) => {
       const [asset] = await tx
         .insert(assets)
-        .values({
-          organizationId,
-          name: input.name,
-          type: input.type,
-          classification: input.classification,
-          ownerId: input.ownerId,
-          supplierId,
-        })
+        .values({ organizationId, ...this.columns(input), supplierId })
         .returning();
       await recordEvent(tx, member, {
         action: 'asset.added',
         recordType: 'asset',
         recordId: asset.id,
         recordLabel: asset.name,
-        after: this.snapshot(input, ownerName),
+        after: this.snapshot(input, names),
       });
       return { id: asset.id };
     });
@@ -136,13 +133,13 @@ export class AssetsService {
 
   async update(member: CurrentMember, id: string, input: AssetInput) {
     const { organizationId } = member;
-    const ownerName = await ownerNameOf(this.db, organizationId, input.ownerId);
+    const names = await this.ownerNames(organizationId, input);
     const row = await this.find(organizationId, id);
     if (row.asset.retiredAt) throw new ConflictException('Reinstate this asset to change it.');
     const currentRef =
       row.supplierNumber !== null ? formatSupplierRef(row.supplierNumber) : null;
-    const before = this.snapshot({ ...row.asset, supplierRef: currentRef }, row.ownerName);
-    const after = this.snapshot(input, ownerName);
+    const before = this.snapshot({ ...row.asset, supplierRef: currentRef }, row);
+    const after = this.snapshot(input, names);
     if (JSON.stringify(before) === JSON.stringify(after)) return { id };
     // An unchanged link stays, even to a Supplier that can't take new assets.
     const supplierId =
@@ -152,13 +149,7 @@ export class AssetsService {
     await this.db.transaction(async (tx) => {
       await tx
         .update(assets)
-        .set({
-          name: input.name,
-          type: input.type,
-          classification: input.classification,
-          ownerId: input.ownerId,
-          supplierId,
-        })
+        .set({ ...this.columns(input), supplierId })
         .where(and(eq(assets.organizationId, organizationId), eq(assets.id, id)));
       await recordEvent(tx, member, {
         action: 'asset.changed',
@@ -217,17 +208,32 @@ export class AssetsService {
     const row = await this.find(organizationId, id);
     if (!row.asset.retiredAt) throw new ConflictException('This asset is not retired.');
     const owner = await ownerOnReturn(this.db, member, row.asset, row.ownerName);
+    // A technical owner who has left is no longer assigned.
+    const technicalLeft =
+      row.asset.technicalOwnerId !== null &&
+      !(await isActiveMember(this.db, organizationId, row.asset.technicalOwnerId));
+    const change = technicalLeft
+      ? {
+          before: { ...owner.change.before, technicalOwnerName: row.technicalOwnerName },
+          after: { ...owner.change.after, technicalOwnerName: null },
+        }
+      : owner.change;
     await this.db.transaction(async (tx) => {
       await tx
         .update(assets)
-        .set({ retiredAt: null, retiredReason: null, ownerId: owner.id })
+        .set({
+          retiredAt: null,
+          retiredReason: null,
+          ownerId: owner.id,
+          ...(technicalLeft && { technicalOwnerId: null }),
+        })
         .where(and(eq(assets.organizationId, organizationId), eq(assets.id, id)));
       await recordEvent(tx, member, {
         action: 'asset.reinstated',
         recordType: 'asset',
         recordId: id,
         recordLabel: row.asset.name,
-        ...owner.change,
+        ...change,
         reason,
       });
     });
@@ -262,7 +268,7 @@ export class AssetsService {
             supplierRef:
               row.supplierNumber !== null ? formatSupplierRef(row.supplierNumber) : null,
           },
-          row.ownerName,
+          row,
         ),
         reason,
       });
@@ -270,13 +276,68 @@ export class AssetsService {
   }
 
   /** What the Audit trail keeps of an asset. */
-  private snapshot(asset: Omit<AssetInput, 'ownerId'>, ownerName: string) {
+  private snapshot(
+    asset: Omit<AssetInput, 'ownerId' | 'technicalOwnerId'>,
+    { ownerName, technicalOwnerName }: OwnerNames,
+  ) {
     return {
       name: asset.name,
       type: asset.type,
+      status: asset.status,
       classification: asset.classification,
       ownerName,
+      technicalOwnerName,
+      location: asset.location,
       supplierRef: asset.supplierRef,
+      validation: asset.validation,
+      source: asset.source,
+      notes: asset.notes,
+    };
+  }
+
+  /** The columns an asset's form sets. The Supplier is resolved from its ref separately. */
+  private columns(input: AssetInput) {
+    const { supplierRef: _supplierRef, ...columns } = input;
+    return columns;
+  }
+
+  private async ownerNames(organizationId: string, input: AssetInput): Promise<OwnerNames> {
+    const [ownerName, technicalOwnerName] = await Promise.all([
+      optionalOwnerNameOf(this.db, organizationId, input.ownerId),
+      optionalOwnerNameOf(this.db, organizationId, input.technicalOwnerId),
+    ]);
+    return { ownerName, technicalOwnerName };
+  }
+
+  /** What the register and an asset's page show of it. */
+  private fields({
+    asset,
+    ownerName,
+    technicalOwnerName,
+    supplierNumber,
+    supplierName,
+  }: {
+    asset: AssetRow;
+    supplierNumber: number | null;
+    supplierName: string | null;
+  } & OwnerNames) {
+    return {
+      id: asset.id,
+      name: asset.name,
+      type: asset.type,
+      status: asset.status,
+      classification: asset.classification,
+      ownerId: asset.ownerId,
+      ownerName,
+      technicalOwnerId: asset.technicalOwnerId,
+      technicalOwnerName,
+      location: asset.location,
+      validation: asset.validation,
+      source: asset.source,
+      notes: asset.notes,
+      retiredAt: asset.retiredAt,
+      retiredReason: asset.retiredReason,
+      supplier: this.supplier(supplierNumber, supplierName),
     };
   }
 
@@ -289,12 +350,15 @@ export class AssetsService {
       .select({
         asset: assets,
         ownerName: users.name,
+        technicalOwnerName: technicalUsers.name,
         supplierNumber: suppliers.number,
         supplierName: suppliers.name,
       })
       .from(assets)
-      .innerJoin(members, eq(members.id, assets.ownerId))
-      .innerJoin(users, eq(users.id, members.userId))
+      .leftJoin(members, eq(members.id, assets.ownerId))
+      .leftJoin(users, eq(users.id, members.userId))
+      .leftJoin(technicalMembers, eq(technicalMembers.id, assets.technicalOwnerId))
+      .leftJoin(technicalUsers, eq(technicalUsers.id, technicalMembers.userId))
       .leftJoin(suppliers, eq(suppliers.id, assets.supplierId))
       .where(and(eq(assets.organizationId, organizationId), isNull(assets.deletedAt), filter));
   }

@@ -294,7 +294,8 @@ export const evidence = pgTable(
     location: text('location'),
     storedFileId: uuid('stored_file_id'),
     documentId: uuid('document_id'),
-    datedOn: date('dated_on').notNull(),
+    // The date the material itself carries. Null when nobody knows it.
+    datedOn: date('dated_on'),
     expiresOn: date('expires_on'),
     addedById: uuid('added_by_id').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -327,6 +328,9 @@ export const evidence = pgTable(
 
 export const supplierCriticality = pgEnum('supplier_criticality', ['low', 'medium', 'high']);
 
+// A contract with an end date, or one that rolls on until someone gives notice.
+export const contractTerm = pgEnum('contract_term', ['fixed', 'rolling']);
+
 export const suppliers = pgTable(
   'suppliers',
   {
@@ -338,12 +342,14 @@ export const suppliers = pgTable(
     number: integer('number').notNull(),
     name: text('name').notNull(),
     provides: text('provides').notNull().default(''),
-    ownerId: uuid('owner_id').notNull(),
-    criticality: supplierCriticality('criticality').notNull().default('medium'),
-    handlesPersonalData: boolean('handles_personal_data').notNull().default(false),
+    // Null while nobody has been assigned. So are the facts below while nobody knows them.
+    ownerId: uuid('owner_id'),
+    criticality: supplierCriticality('criticality'),
+    handlesPersonalData: boolean('handles_personal_data'),
     // Who to reach about a security problem.
     contact: text('contact').notNull().default(''),
-    // Null means the contract rolls on with no end date.
+    contractTerm: contractTerm('contract_term'),
+    // Set exactly when the contract term is fixed.
     contractEnds: date('contract_ends'),
     exitPlan: text('exit_plan').notNull().default(''),
     nextReviewOn: date('next_review_on').notNull(),
@@ -362,6 +368,10 @@ export const suppliers = pgTable(
       columns: [t.organizationId, t.ownerId],
       foreignColumns: [members.organizationId, members.id],
     }),
+    check(
+      'suppliers_contract_ends_when_fixed',
+      sql`(${t.contractEnds} is not null) = (${t.contractTerm} is not distinct from 'fixed')`,
+    ),
   ],
 );
 
@@ -384,7 +394,8 @@ export const supplierFiles = pgTable(
     title: text('title').notNull(),
     location: text('location'),
     storedFileId: uuid('stored_file_id'),
-    datedOn: date('dated_on').notNull(),
+    // The date on the paperwork. Null when nobody knows it.
+    datedOn: date('dated_on'),
     expiresOn: date('expires_on'),
     ...timestamps,
   },
@@ -455,6 +466,12 @@ export const classification = pgEnum('classification', [
   'strictly_confidential',
 ]);
 
+// Planned assets aren't in use yet, but already count for risks and Suppliers.
+export const assetStatus = pgEnum('asset_status', ['planned', 'operational']);
+
+// Whether someone has checked the record against the asset itself, or it is still as found.
+export const assetValidation = pgEnum('asset_validation', ['unvalidated', 'validated']);
+
 export const assets = pgTable(
   'assets',
   {
@@ -464,10 +481,21 @@ export const assets = pgTable(
       .references(() => organizations.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     type: assetType('type').notNull(),
-    ownerId: uuid('owner_id').notNull(),
-    classification: classification('classification').notNull().default('internal'),
+    status: assetStatus('status').notNull().default('operational'),
+    // The business owner, accountable for the asset. Null while nobody has been assigned.
+    ownerId: uuid('owner_id'),
+    // Who runs it day to day. Null while nobody has been assigned.
+    technicalOwnerId: uuid('technical_owner_id'),
+    // Null until someone has classified it.
+    classification: classification('classification'),
+    // Where it is: offices, data centres, cloud regions.
+    location: text('location').notNull().default(''),
     // The Supplier that provides this asset, if any.
     supplierId: uuid('supplier_id'),
+    validation: assetValidation('validation').notNull().default('unvalidated'),
+    // Where the record came from, such as an inventory export or an interview.
+    source: text('source').notNull().default(''),
+    notes: text('notes').notNull().default(''),
     // A retired asset is no longer in use but stays on record.
     retiredAt: timestamp('retired_at', { withTimezone: true }),
     retiredReason: text('retired_reason'),
@@ -480,6 +508,11 @@ export const assets = pgTable(
     foreignKey({
       name: 'assets_owner_fk',
       columns: [t.organizationId, t.ownerId],
+      foreignColumns: [members.organizationId, members.id],
+    }),
+    foreignKey({
+      name: 'assets_technical_owner_fk',
+      columns: [t.organizationId, t.technicalOwnerId],
       foreignColumns: [members.organizationId, members.id],
     }),
     foreignKey({

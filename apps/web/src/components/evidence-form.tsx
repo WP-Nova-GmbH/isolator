@@ -59,15 +59,8 @@ export function EvidenceForm({ entries, documents, onClose }: EvidenceFormProps)
           </Field>
         </FieldGrid>
         <FieldGrid>
-          <Field label="Dated" htmlFor="evidence-dated">
-            <Input
-              id="evidence-dated"
-              name="datedOn"
-              type="date"
-              max={todayIso()}
-              defaultValue={todayIso()}
-              required
-            />
+          <Field label="Dated, if known" htmlFor="evidence-dated">
+            <Input id="evidence-dated" name="datedOn" type="date" max={todayIso()} />
           </Field>
           <Field label="Expires, if it does" htmlFor="evidence-expires">
             <Input id="evidence-expires" name="expiresOn" type="date" />

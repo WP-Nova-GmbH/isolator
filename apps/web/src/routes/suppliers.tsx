@@ -13,7 +13,8 @@ import {
 } from '@/components/ui/table';
 import { api } from '@/lib/api';
 import { useAppData } from '@/lib/members';
-import { criticalityLabels, type Supplier } from '@/lib/suppliers';
+import { contractEndLabel, criticalityLabels, type Supplier } from '@/lib/suppliers';
+import { UNASSIGNED, UNKNOWN } from '@/components/owner-select';
 
 export async function suppliersLoader() {
   const [suppliers, ended] = await Promise.all([
@@ -88,11 +89,19 @@ export function Suppliers() {
                     <div className="text-xs text-muted-foreground">{supplier.provides}</div>
                   )}
                 </MainCell>
-                <TableCell>{criticalityLabels[supplier.criticality]}</TableCell>
+                {supplier.criticality ? (
+                  <TableCell>{criticalityLabels[supplier.criticality]}</TableCell>
+                ) : (
+                  <DataCell>{UNKNOWN}</DataCell>
+                )}
                 <DataCell>{supplier.assetCount}</DataCell>
-                <DataCell>{supplier.contractEnds ?? 'Rolling'}</DataCell>
+                <DataCell>{contractEndLabel(supplier)}</DataCell>
                 <DataCell>{supplier.nextReviewOn}</DataCell>
-                <TableCell>{supplier.ownerName}</TableCell>
+                {supplier.ownerName ? (
+                  <TableCell>{supplier.ownerName}</TableCell>
+                ) : (
+                  <DataCell>{UNASSIGNED}</DataCell>
+                )}
                 <TableCell>
                   <StateBadge kind="supplier" state={supplier.state} />
                 </TableCell>

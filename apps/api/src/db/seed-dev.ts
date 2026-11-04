@@ -53,6 +53,7 @@ const sampleSuppliers = [
     criticality: 'high',
     handlesPersonalData: true,
     contact: 'Microsoft 365 admin center, support request',
+    contractTerm: 'fixed',
     contractEnds: '2027-03-31',
     exitPlan: 'Export mailboxes and files, then move to another mail host within 30 days.',
     nextReviewOn: '2027-01-15',
@@ -74,6 +75,7 @@ const sampleSuppliers = [
     criticality: 'high',
     handlesPersonalData: true,
     contact: 'Hetzner support, abuse and security contact form',
+    contractTerm: 'rolling',
     contractEnds: null,
     exitPlan: 'Restore the nightly backups on another provider.',
     nextReviewOn: '2027-02-01',
@@ -95,6 +97,7 @@ const sampleSuppliers = [
     criticality: 'medium',
     handlesPersonalData: true,
     contact: 'GitHub support portal',
+    contractTerm: 'fixed',
     contractEnds: '2026-12-31',
     exitPlan: '',
     nextReviewOn: '2026-10-15',
@@ -109,15 +112,27 @@ const sampleSuppliers = [
   },
 ] as const;
 
-const sampleAssets = [
-  { name: 'Customer data', type: 'information', classification: 'strictly_confidential', owner: 'Anna Keller' },
-  { name: 'Source code', type: 'information', classification: 'confidential', owner: 'Jonas Weber', supplier: 'GitHub' },
-  { name: 'Microsoft 365', type: 'service', classification: 'confidential', owner: 'Jonas Weber', supplier: 'Microsoft' },
-  { name: 'Hetzner cloud servers', type: 'service', classification: 'confidential', owner: 'Jonas Weber', supplier: 'Hetzner' },
-  { name: 'Staff laptops', type: 'hardware', classification: 'internal', owner: 'Lea Fischer' },
-  { name: 'Admin staff', type: 'people', classification: 'internal', owner: 'Anna Keller' },
+const sampleAssets: {
+  name: string;
+  type: 'information' | 'software' | 'hardware' | 'service' | 'people' | 'site';
+  classification: 'public' | 'internal' | 'confidential' | 'strictly_confidential' | null;
+  owner: string | null;
+  technicalOwner?: string;
+  supplier?: string;
+  status?: 'planned';
+  location?: string;
+  validated?: boolean;
+  source?: string;
+}[] = [
+  { name: 'Customer data', type: 'information', classification: 'strictly_confidential', owner: 'Anna Keller', technicalOwner: 'Jonas Weber', location: 'Microsoft 365, Germany', validated: true, source: 'ISMS kick-off workshop' },
+  { name: 'Source code', type: 'information', classification: 'confidential', owner: 'Jonas Weber', supplier: 'GitHub', validated: true, source: 'ISMS kick-off workshop' },
+  { name: 'Microsoft 365', type: 'service', classification: 'confidential', owner: 'Jonas Weber', technicalOwner: 'Jonas Weber', supplier: 'Microsoft', location: 'EU data boundary', validated: true, source: 'Licence overview' },
+  { name: 'Hetzner cloud servers', type: 'service', classification: 'confidential', owner: 'Jonas Weber', technicalOwner: 'Jonas Weber', supplier: 'Hetzner', location: 'Falkenstein, Germany', validated: true, source: 'Hetzner console export' },
+  { name: 'Staff laptops', type: 'hardware', classification: 'internal', owner: 'Lea Fischer', technicalOwner: 'Lea Fischer', location: 'Home offices', source: 'Device management export' },
+  { name: 'Admin staff', type: 'people', classification: 'internal', owner: 'Anna Keller', validated: true },
   { name: 'Home offices', type: 'site', classification: 'internal', owner: 'Anna Keller' },
-] as const;
+  { name: 'Backup storage', type: 'service', classification: null, owner: null, technicalOwner: 'Jonas Weber', status: 'planned', location: 'Second region, not chosen yet', source: 'Restore test, 2026-10' },
+];
 
 interface SampleRisk {
   title: string;
@@ -478,13 +493,18 @@ async function main() {
     const insertedAssets = await tx
       .insert(assets)
       .values(
-        sampleAssets.map(({ ...asset }) => ({
+        sampleAssets.map((asset) => ({
           name: asset.name,
           type: asset.type,
+          status: asset.status ?? ('operational' as const),
           classification: asset.classification,
-          ownerId: memberId(asset.owner),
+          ownerId: asset.owner ? memberId(asset.owner) : null,
+          technicalOwnerId: asset.technicalOwner ? memberId(asset.technicalOwner) : null,
+          location: asset.location ?? '',
+          validation: asset.validated ? ('validated' as const) : ('unvalidated' as const),
+          source: asset.source ?? '',
           organizationId,
-          supplierId: 'supplier' in asset ? supplierIds.get(asset.supplier) : null,
+          supplierId: asset.supplier ? supplierIds.get(asset.supplier) : null,
         })),
       )
       .returning();

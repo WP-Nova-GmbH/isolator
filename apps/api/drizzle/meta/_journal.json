@@ -148,6 +148,20 @@
       "when": 1793639508692,
       "tag": "0020_clerk_sign_in",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793821139074,
+      "tag": "0021_unknown_and_unassigned",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793821237514,
+      "tag": "0022_richer_asset_records",
+      "breakpoints": true
     }
   ]
 }

@@ -43,7 +43,8 @@ export interface EvidenceItem {
   location: string | null;
   upload: StoredFile | null;
   document: { id: string; title: string } | null;
-  datedOn: string;
+  /** Null when the date the evidence carries isn't known. */
+  datedOn: string | null;
   expiresOn: string | null;
   addedBy: string;
   state: State<'evidence'>;
@@ -74,7 +75,7 @@ export function addEvidence(form: FormData, ref: string) {
         location: form.get('location') || null,
         storedFileId: stored?.id ?? null,
         documentId: form.get('documentId') || null,
-        datedOn: form.get('datedOn'),
+        datedOn: form.get('datedOn') || null,
         expiresOn: form.get('expiresOn') || null,
       },
     }),

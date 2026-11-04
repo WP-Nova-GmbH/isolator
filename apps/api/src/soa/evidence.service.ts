@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { recordEvent } from '../audit/audit-trail';
 import { DB, type Database } from '../db/db.module';
@@ -24,13 +24,14 @@ export const evidenceInput = z
     location: z.string().trim().nullable(),
     storedFileId: z.uuid().nullable(),
     documentId: z.uuid().nullable(),
-    datedOn: z.iso.date('Choose the date of the evidence.'),
+    // Null when the date the evidence carries isn't known.
+    datedOn: z.iso.date().nullable(),
     expiresOn: z.iso.date().nullable(),
   })
   .refine((item) => item.location || item.storedFileId || item.documentId, {
     message: 'Upload a file, link a Document, or say where it is kept.',
   })
-  .refine((item) => !item.expiresOn || item.expiresOn > item.datedOn, {
+  .refine((item) => !item.expiresOn || !item.datedOn || item.expiresOn > item.datedOn, {
     message: 'It can’t expire before it is dated.',
   });
 
@@ -68,7 +69,7 @@ export class EvidenceService {
           entryId ? eq(evidence.soaEntryId, entryId) : undefined,
         ),
       )
-      .orderBy(desc(evidence.datedOn), desc(evidence.createdAt));
+      .orderBy(sql`${evidence.datedOn} desc nulls last`, desc(evidence.createdAt));
     const now = today();
     return rows.map(({ item, entry, control, file, document, addedBy }) => ({
       id: item.id,

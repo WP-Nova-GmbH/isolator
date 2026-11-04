@@ -10,10 +10,13 @@ export type SupplierReviewOutcome = 'no_concerns' | 'concerns' | 'stop_using';
 const FILE_EXPIRY_WARNING_DAYS = 30;
 const CONTRACT_END_WARNING_DAYS = 60;
 
+/** Null means nobody knows yet, or nobody has been assigned. */
 interface SupplierFacts {
   endedAt: Date | null;
-  criticality: SupplierCriticality;
-  handlesPersonalData: boolean;
+  ownerId: string | null;
+  criticality: SupplierCriticality | null;
+  handlesPersonalData: boolean | null;
+  contractTerm: 'fixed' | 'rolling' | null;
   contractEnds: string | null;
   exitPlan: string;
   nextReviewOn: string;
@@ -81,6 +84,13 @@ export function supplierAttention(
   if (!notExpired.some((file) => file.kind === 'contract')) {
     attention.push('No contract on file.');
   }
+  // What nobody has found out yet.
+  if (!supplier.ownerId) attention.push('Nobody owns this Supplier.');
+  if (!supplier.criticality) attention.push('Their criticality is unknown.');
+  if (supplier.handlesPersonalData === null) {
+    attention.push('Whether they handle personal data is unknown.');
+  }
+  if (!supplier.contractTerm) attention.push('The contract term is unknown.');
   if (supplier.contractEnds && supplier.contractEnds < today) {
     attention.push(`The contract ended on ${supplier.contractEnds}.`);
   } else if (

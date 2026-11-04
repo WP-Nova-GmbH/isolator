@@ -14,7 +14,12 @@ import { IncidentsService } from '../incidents/incidents.service';
 import { taskInput, TasksService } from '../tasks/tasks.service';
 import { testDatabaseUrl } from '../test/database';
 import { testFiles } from '../test/files';
-import { supplierFileInput, SuppliersService, type SupplierInput } from './suppliers.service';
+import {
+  supplierFileInput,
+  supplierInput,
+  SuppliersService,
+  type SupplierInput,
+} from './suppliers.service';
 
 const { db, client } = createDb(testDatabaseUrl());
 const trail = new AuditTrailService(db);
@@ -62,6 +67,7 @@ function input(ownerId: string, overrides: Partial<SupplierInput> = {}): Supplie
     criticality: 'medium',
     handlesPersonalData: false,
     contact: 'security@example.com',
+    contractTerm: 'rolling',
     contractEnds: null,
     exitPlan: '',
     nextReviewOn: '2099-01-01',
@@ -122,6 +128,51 @@ describe('supplier register', () => {
       before: { criticality: 'medium' },
       after: { criticality: 'high' },
     });
+  });
+});
+
+describe('what nobody knows yet', () => {
+  it('can stay unknown or unassigned, and the Supplier says what is missing', async () => {
+    const org = await organization();
+    const { ref } = await suppliers.create(
+      org.owner,
+      supplierInput.parse({
+        ...input(org.owner.id),
+        ownerId: null,
+        criticality: null,
+        handlesPersonalData: null,
+        contractTerm: null,
+      }),
+    );
+    const supplier = await suppliers.get(org.id, ref);
+    expect(supplier).toMatchObject({
+      ownerId: null,
+      ownerName: null,
+      criticality: null,
+      handlesPersonalData: null,
+      contractTerm: null,
+      contractEnds: null,
+    });
+    expect(supplier.attention).toContain('The contract term is unknown.');
+    expect(supplier.attention).toContain('Nobody owns this Supplier.');
+  });
+
+  it('tells a rolling contract from an unknown one, and needs an end date for a fixed one', () => {
+    const rolling = supplierInput.parse({
+      ...input(randomUUID()),
+      contractTerm: 'rolling',
+      contractEnds: '2027-01-01',
+    });
+    expect(rolling.contractEnds).toBeNull();
+    const { error } = supplierInput.safeParse({ ...input(randomUUID()), contractTerm: 'fixed' });
+    expect(error?.issues[0].message).toBe('Choose when the contract ends.');
+  });
+
+  it('takes a file whose date nobody knows', async () => {
+    const org = await organization();
+    const { ref } = await suppliers.create(org.owner, input(org.owner.id));
+    await suppliers.addFile(org.owner, ref, supplierFileInput.parse({ ...file, datedOn: null }));
+    expect((await suppliers.get(org.id, ref)).files[0]).toMatchObject({ datedOn: null });
   });
 });
 

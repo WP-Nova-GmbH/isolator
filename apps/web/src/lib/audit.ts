@@ -1,8 +1,12 @@
 import type { HistoryItem } from '@/components/history-list';
 import {
+  assetStatusLabels,
   assetTypeLabels,
   classificationLabels,
+  validationLabels,
+  type AssetStatus,
   type AssetType,
+  type AssetValidation,
   type Classification,
 } from '@/lib/assets';
 import { documentKindLabels, type DocumentKind } from '@/lib/documents';
@@ -14,6 +18,11 @@ import {
   type SupplierCriticality,
   type SupplierReviewOutcome,
 } from '@/lib/suppliers';
+
+/** "Owner changed to Anna", or that nobody owns it now. */
+function ownerChange(label: string, name: unknown) {
+  return name ? `${label} changed to ${String(name)}` : `${label} now unassigned`;
+}
 
 type Value = Record<string, unknown>;
 
@@ -93,20 +102,32 @@ function describeSupplierChange(before: Value, after: Value) {
   const changed = (field: string) => before[field] !== after[field];
   if (changed('name')) changes.push(`Name changed to “${String(after.name)}”`);
   if (changed('provides')) changes.push('What they provide changed');
-  if (changed('ownerName')) changes.push(`Owner changed to ${String(after.ownerName)}`);
+  if (changed('ownerName')) changes.push(ownerChange('Owner', after.ownerName));
   if (changed('criticality')) {
     changes.push(
-      `Criticality changed to ${criticalityLabels[after.criticality as SupplierCriticality]}`,
+      after.criticality
+        ? `Criticality changed to ${criticalityLabels[after.criticality as SupplierCriticality]}`
+        : 'Criticality now unknown',
     );
   }
   if (changed('handlesPersonalData')) {
-    changes.push(after.handlesPersonalData ? 'Handles personal data' : 'No longer handles personal data');
+    const personalData = {
+      true: 'Handles personal data',
+      false: 'Doesn’t handle personal data',
+      null: 'Whether they handle personal data is now unknown',
+    };
+    changes.push(personalData[String(after.handlesPersonalData) as keyof typeof personalData]);
   }
   if (changed('contact')) changes.push('Security contact changed');
-  if (changed('contractEnds')) {
-    changes.push(
-      after.contractEnds ? `Contract end changed to ${String(after.contractEnds)}` : 'Contract now rolls on',
-    );
+  // Before contract terms, a missing end date meant the contract rolls on.
+  const term = (value: Value) =>
+    'contractTerm' in value ? value.contractTerm : value.contractEnds ? 'fixed' : 'rolling';
+  if (changed('contractEnds') || term(before) !== term(after)) {
+    const ending = {
+      fixed: `Contract end changed to ${String(after.contractEnds)}`,
+      rolling: 'Contract now rolls on',
+    };
+    changes.push(ending[term(after) as keyof typeof ending] ?? 'Contract term now unknown');
   }
   if (changed('exitPlan')) changes.push('Exit plan changed');
   if (changed('nextReviewOn')) changes.push(`Next review moved to ${String(after.nextReviewOn)}`);
@@ -115,20 +136,35 @@ function describeSupplierChange(before: Value, after: Value) {
 
 function describeAssetChange(before: Value, after: Value) {
   const changes: string[] = [];
-  if (before.name !== after.name) changes.push(`Name changed to “${String(after.name)}”`);
-  if (before.type !== after.type) {
+  // Fields added later are missing from older events, which says nothing about a change.
+  const changed = (field: string) => field in before && before[field] !== after[field];
+  if (changed('name')) changes.push(`Name changed to “${String(after.name)}”`);
+  if (changed('type')) {
     changes.push(`Type changed to ${assetTypeLabels[after.type as AssetType]}`);
   }
-  if (before.classification !== after.classification) {
-    const label = classificationLabels[after.classification as Classification];
-    changes.push(`Classification changed to ${label}`);
+  if (changed('status')) {
+    changes.push(`Status changed to ${assetStatusLabels[after.status as AssetStatus]}`);
   }
-  if (before.ownerName !== after.ownerName) {
-    changes.push(`Owner changed to ${String(after.ownerName)}`);
+  if (changed('classification')) {
+    changes.push(
+      after.classification
+        ? `Classification changed to ${classificationLabels[after.classification as Classification]}`
+        : 'Classification now unknown',
+    );
   }
-  if (before.supplierRef !== after.supplierRef) {
+  if (changed('ownerName')) changes.push(ownerChange('Business owner', after.ownerName));
+  if (changed('technicalOwnerName')) {
+    changes.push(ownerChange('Technical owner', after.technicalOwnerName));
+  }
+  if (changed('location')) changes.push('Locations changed');
+  if (changed('supplierRef')) {
     changes.push(after.supplierRef ? `Supplier changed to ${String(after.supplierRef)}` : 'Supplier removed');
   }
+  if (changed('validation')) {
+    changes.push(validationLabels[after.validation as AssetValidation]);
+  }
+  if (changed('source')) changes.push('Source changed');
+  if (changed('notes')) changes.push('Notes changed');
   return changes.join('. ');
 }
 
@@ -218,7 +254,14 @@ function fileLabel({ title, upload }: FileEntry) {
 /** One event as a sentence: the same words on a record's History and in the Audit trail. */
 /** If the owner had left, the record went to whoever brought it back. */
 function describeReturn(text: string, after: Value | null) {
-  return after ? `${text}. Owner changed to ${String(after.ownerName)}` : text;
+  if (!after) return text;
+  return [
+    text,
+    'ownerName' in after && ownerChange('Owner', after.ownerName),
+    'technicalOwnerName' in after && ownerChange('Technical owner', after.technicalOwnerName),
+  ]
+    .filter(Boolean)
+    .join('. ');
 }
 
 export function describeEvent({ action, recordLabel, before, after }: AuditEvent) {

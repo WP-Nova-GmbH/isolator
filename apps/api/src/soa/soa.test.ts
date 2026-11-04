@@ -209,6 +209,17 @@ describe('Evidence', () => {
     expect(evidenceInput.safeParse(dates).error?.issues[0].message).toContain('expire');
   });
 
+  it('can have a date nobody knows, and lists after what is dated', async () => {
+    const org = await organization();
+    await proof.add(org.owner, 'A.5.15', { ...item, title: 'Undated', datedOn: null });
+    await proof.add(org.owner, 'A.5.15', item);
+    const listed = await proof.list(org.id);
+    expect(listed.map(({ title, datedOn }) => ({ title, datedOn }))).toEqual([
+      { title: 'Access review', datedOn: '2026-01-15' },
+      { title: 'Undated', datedOn: null },
+    ]);
+  });
+
   it('goes with its upload when removed, and the trail keeps the proof', async () => {
     const org = await organization();
     const stored = await files.store(org.owner, upload);

@@ -44,9 +44,15 @@ function input(ownerId: string, overrides: Partial<AssetInput> = {}): AssetInput
   return {
     name: 'CRM',
     type: 'software',
+    status: 'operational',
     classification: 'confidential',
     ownerId,
+    technicalOwnerId: null,
+    location: '',
     supplierRef: null,
+    validation: 'unvalidated',
+    source: '',
+    notes: '',
     ...overrides,
   };
 }
@@ -58,6 +64,7 @@ const supplierInput = (ownerId: string) => ({
   criticality: 'medium' as const,
   handlesPersonalData: false,
   contact: '',
+  contractTerm: 'rolling' as const,
   contractEnds: null,
   exitPlan: '',
   nextReviewOn: '2099-01-01',
@@ -145,6 +152,24 @@ describe('retiring an asset', () => {
       after: { ownerName: 'Owner' },
     });
   });
+
+  it('comes back without its technical owner if they have left, and unassigned stays so', async () => {
+    const org = await organization();
+    const { id } = await assets.create(
+      org.owner,
+      input(org.colleague.id, { ownerId: null, technicalOwnerId: org.colleague.id }),
+    );
+    await assets.retire(org.owner, id, 'Gone');
+    await membersService.remove(org.owner, org.colleague.id, 'Left');
+    await assets.reinstate(org.owner, id, 'Back in use');
+
+    const record = await assets.get(org.id, id);
+    expect(record).toMatchObject({ ownerId: null, technicalOwnerId: null });
+    expect(record.history[0]).toMatchObject({
+      before: { technicalOwnerName: 'Colleague' },
+      after: { technicalOwnerName: null },
+    });
+  });
 });
 
 describe('deleting an asset', () => {
@@ -214,6 +239,44 @@ describe('assets', () => {
     });
   });
 
+  it('keep where they are, who runs them, where the record came from and whether it is checked', async () => {
+    const org = await organization();
+    const details = {
+      status: 'planned' as const,
+      technicalOwnerId: org.colleague.id,
+      location: 'Frankfurt office, AWS eu-central-1',
+      validation: 'validated' as const,
+      source: 'IT inventory export, 2026-10',
+      notes: 'Replaces the old CRM next year.',
+    };
+    const { id } = await assets.create(org.owner, input(org.owner.id, details));
+    expect(await assets.get(org.id, id)).toMatchObject({
+      ...details,
+      ownerName: 'Owner',
+      technicalOwnerName: 'Colleague',
+    });
+    expect((await assets.get(org.id, id)).history[0]).toMatchObject({
+      after: { status: 'planned', technicalOwnerName: 'Colleague', validation: 'validated' },
+    });
+  });
+
+  it('can have no owners and no classification yet', async () => {
+    const org = await organization();
+    const { id } = await assets.create(
+      org.owner,
+      input(org.owner.id, { ownerId: null, classification: null }),
+    );
+    expect(await assets.list(org.id)).toEqual([
+      expect.objectContaining({
+        id,
+        ownerId: null,
+        ownerName: null,
+        technicalOwnerName: null,
+        classification: null,
+      }),
+    ]);
+  });
+
   it('link to the Supplier that provides them', async () => {
     const org = await organization();
     const { ref } = await suppliers.create(org.owner, supplierInput(org.owner.id));
@@ -244,6 +307,9 @@ describe('assets', () => {
     await expect(assets.get(b.id, id)).rejects.toThrow('does not exist');
     await expect(assets.update(b.owner, id, input(b.owner.id))).rejects.toThrow('does not exist');
     await expect(assets.create(a.owner, input(b.owner.id))).rejects.toThrow('Choose an owner');
+    await expect(
+      assets.create(a.owner, input(a.owner.id, { technicalOwnerId: b.owner.id })),
+    ).rejects.toThrow('Choose an owner');
     await expect(
       assets.create(a.owner, input(a.owner.id, { supplierRef: 'S-99' })),
     ).rejects.toThrow('does not exist');

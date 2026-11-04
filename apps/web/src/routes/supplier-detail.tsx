@@ -19,6 +19,7 @@ import { HistoryList } from '@/components/history-list';
 import { LifecycleCard, type LifecycleAction } from '@/components/lifecycle-card';
 import { LinkedItem, LinkPicker } from '@/components/link-picker';
 import { NewTaskForm } from '@/components/new-task-form';
+import { UNKNOWN } from '@/components/owner-select';
 import { PageHeader, SectionHeader } from '@/components/page-header';
 import { RiskScore } from '@/components/risk-score';
 import { StateBadge } from '@/components/state-badge';
@@ -73,7 +74,7 @@ function addFile(path: string, form: FormData) {
         title: form.get('title') || file?.name,
         location: form.get('location') || null,
         storedFileId: stored?.id ?? null,
-        datedOn: form.get('datedOn'),
+        datedOn: form.get('datedOn') || null,
         expiresOn: form.get('expiresOn') || null,
       },
     }),
@@ -231,8 +232,8 @@ function FileForm({ onClose }: { onClose: () => void }) {
           </Field>
         </FieldGrid>
         <FieldGrid>
-          <Field label="Dated" htmlFor="file-dated">
-            <Input id="file-dated" name="datedOn" type="date" required />
+          <Field label="Dated, if known" htmlFor="file-dated">
+            <Input id="file-dated" name="datedOn" type="date" />
           </Field>
           <Field label="Expires, if it does" htmlFor="file-expires">
             <Input id="file-expires" name="expiresOn" type="date" />
@@ -414,7 +415,7 @@ export function SupplierDetail() {
                   <DataCell className="min-w-44 whitespace-normal">
                     <FileLocation file={file} />
                   </DataCell>
-                  <DataCell>{file.datedOn}</DataCell>
+                  <DataCell>{file.datedOn ?? UNKNOWN}</DataCell>
                   <DataCell>{file.expiresOn ?? 'None'}</DataCell>
                   <TableCell>
                     <StateBadge kind="evidence" state={file.state} />

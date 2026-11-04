@@ -139,6 +139,18 @@ export class MembersService {
       tally(documents, and(isNull(documents.withdrawnAt), isNull(documents.deletedAt))),
       tally(soaEntries, undefined),
       tally(tasks, and(isNull(tasks.doneAt), isNull(tasks.cancelledAt))),
+      this.db
+        .select({ total: count() })
+        .from(assets)
+        .where(
+          and(
+            eq(assets.organizationId, organizationId),
+            eq(assets.technicalOwnerId, ownerId),
+            isNull(assets.retiredAt),
+            isNull(assets.deletedAt),
+          ),
+        )
+        .then(([{ total }]) => total),
     ]);
     const labels = [
       ['risk', 'risks'],
@@ -149,6 +161,7 @@ export class MembersService {
       ['Document', 'Documents'],
       ['SoA entry', 'SoA entries'],
       ['open Task', 'open Tasks'],
+      ['asset as technical owner', 'assets as technical owner'],
     ];
     return totals.flatMap((total, index) =>
       total > 0 ? [`${total} ${labels[index][total === 1 ? 0 : 1]}`] : [],

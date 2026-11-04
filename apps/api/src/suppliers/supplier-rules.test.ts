@@ -11,8 +11,10 @@ const today = '2026-11-01';
 
 const supplier = {
   endedAt: null,
+  ownerId: 'owner',
   criticality: 'medium' as const,
   handlesPersonalData: false,
+  contractTerm: 'rolling' as const,
   contractEnds: null,
   exitPlan: '',
   nextReviewOn: '2027-01-01',
@@ -53,6 +55,22 @@ describe('supplierState', () => {
 describe('supplierAttention', () => {
   it('has nothing to say about a Supplier in good order', () => {
     expect(supplierAttention(supplier, [contract], 'no_concerns', today)).toEqual([]);
+  });
+
+  it('asks for what nobody knows yet', () => {
+    const unknown = {
+      ...supplier,
+      ownerId: null,
+      criticality: null,
+      handlesPersonalData: null,
+      contractTerm: null,
+    };
+    expect(supplierAttention(unknown, [contract], 'no_concerns', today)).toEqual([
+      'Nobody owns this Supplier.',
+      'Their criticality is unknown.',
+      'Whether they handle personal data is unknown.',
+      'The contract term is unknown.',
+    ]);
   });
 
   it('says nothing about an ended Supplier', () => {

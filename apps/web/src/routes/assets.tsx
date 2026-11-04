@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { UNASSIGNED, UNKNOWN } from '@/components/owner-select';
 import { api } from '@/lib/api';
 import { assetTypeLabels, classificationLabels, type Asset } from '@/lib/assets';
 import { useAppData } from '@/lib/members';
@@ -20,6 +21,16 @@ export async function assetsLoader() {
     api<Asset[]>('/assets?state=retired'),
   ]);
   return { assets, retired };
+}
+
+/** What still has to happen before the record can be relied on. */
+function AssetNote({ asset }: { asset: Asset }) {
+  const note = [
+    asset.status === 'planned' && 'Planned',
+    asset.validation === 'unvalidated' && 'Not validated',
+  ].filter(Boolean);
+  if (note.length === 0) return null;
+  return <div className="text-xs text-muted-foreground">{note.join(' · ')}</div>;
 }
 
 export function Assets() {
@@ -43,7 +54,7 @@ export function Assets() {
             <TableHead>Asset</TableHead>
             <TableHead>Type</TableHead>
             <TableHead>Classification</TableHead>
-            <TableHead>Owner</TableHead>
+            <TableHead>Business owner</TableHead>
             <TableHead>Supplier</TableHead>
             <TableHead>Open risks</TableHead>
           </TableRow>
@@ -53,10 +64,19 @@ export function Assets() {
             <TableRow key={asset.id}>
               <MainCell>
                 <RecordLink to={`/assets/${asset.id}`}>{asset.name}</RecordLink>
+                <AssetNote asset={asset} />
               </MainCell>
               <TableCell>{assetTypeLabels[asset.type]}</TableCell>
-              <TableCell>{classificationLabels[asset.classification]}</TableCell>
-              <TableCell>{asset.ownerName}</TableCell>
+              {asset.classification ? (
+                <TableCell>{classificationLabels[asset.classification]}</TableCell>
+              ) : (
+                <DataCell>{UNKNOWN}</DataCell>
+              )}
+              {asset.ownerName ? (
+                <TableCell>{asset.ownerName}</TableCell>
+              ) : (
+                <DataCell>{UNASSIGNED}</DataCell>
+              )}
               {asset.supplier ? (
                 <TableCell>
                   <RecordLink to={`/suppliers/${asset.supplier.ref}`} className="font-normal">
@@ -93,7 +113,7 @@ export function Assets() {
                   <MainCell>
                     <RecordLink to={`/assets/${asset.id}`}>{asset.name}</RecordLink>
                   </MainCell>
-                  <TableCell>{asset.ownerName}</TableCell>
+                  <TableCell>{asset.ownerName ?? UNASSIGNED}</TableCell>
                   <DataCell>{asset.retiredAt?.slice(0, 10)}</DataCell>
                   <DataCell className="min-w-40 whitespace-normal">{asset.retiredReason}</DataCell>
                 </TableRow>

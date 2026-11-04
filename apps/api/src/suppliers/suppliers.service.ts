@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, asc, count, desc, eq, isNotNull, isNull, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { AuditTrailService, recordEvent } from '../audit/audit-trail';
 import { DB, type Database } from '../db/db.module';
@@ -24,7 +24,7 @@ import {
 } from '../db/schema';
 import { FilesService } from '../files/files.service';
 import type { CurrentMember } from '../members/current-member';
-import { ownerNameOf, ownerOnReturn } from '../members/owner-name';
+import { optionalOwnerNameOf, ownerOnReturn } from '../members/owner-name';
 import { formatRiskRef } from '../risks/risk-decision';
 import { assertNoOpenTasks } from '../tasks/open-tasks';
 import { today } from '../validation';
@@ -38,17 +38,28 @@ import {
 
 const isoDate = z.iso.date();
 
-export const supplierInput = z.object({
-  name: z.string().trim().min(1, 'Give the Supplier a name.'),
-  provides: z.string().trim(),
-  ownerId: z.uuid('Choose an owner.'),
-  criticality: z.enum(['low', 'medium', 'high']),
-  handlesPersonalData: z.boolean(),
-  contact: z.string().trim(),
-  contractEnds: isoDate.nullable(),
-  exitPlan: z.string().trim(),
-  nextReviewOn: z.iso.date('Choose the next review date.'),
-});
+// Null in ownerId, criticality, handlesPersonalData and contractTerm means not known yet.
+export const supplierInput = z
+  .object({
+    name: z.string().trim().min(1, 'Give the Supplier a name.'),
+    provides: z.string().trim(),
+    ownerId: z.uuid('Choose an owner.').nullable(),
+    criticality: z.enum(['low', 'medium', 'high']).nullable(),
+    handlesPersonalData: z.boolean().nullable(),
+    contact: z.string().trim(),
+    contractTerm: z.enum(['fixed', 'rolling']).nullable(),
+    contractEnds: isoDate.nullable(),
+    exitPlan: z.string().trim(),
+    nextReviewOn: z.iso.date('Choose the next review date.'),
+  })
+  .refine((supplier) => supplier.contractTerm !== 'fixed' || supplier.contractEnds, {
+    message: 'Choose when the contract ends.',
+  })
+  // Only a fixed term has an end date.
+  .transform((supplier) => ({
+    ...supplier,
+    contractEnds: supplier.contractTerm === 'fixed' ? supplier.contractEnds : null,
+  }));
 
 export const supplierReviewInput = z
   .object({
@@ -73,13 +84,14 @@ export const supplierFileInput = z
     title: z.string('Name the file, or upload one.').trim().min(1, 'Name the file, or upload one.'),
     location: z.string().trim().nullable(),
     storedFileId: z.uuid().nullable(),
-    datedOn: z.iso.date('Choose the date on the file.'),
+    // Null when the date on the paperwork isn't known.
+    datedOn: isoDate.nullable(),
     expiresOn: isoDate.nullable(),
   })
   .refine((file) => file.location || file.storedFileId, {
     message: 'Upload the file, or say where it is kept.',
   })
-  .refine((file) => !file.expiresOn || file.expiresOn > file.datedOn, {
+  .refine((file) => !file.expiresOn || !file.datedOn || file.expiresOn > file.datedOn, {
     message: 'It can’t expire before it is dated.',
   });
 
@@ -144,7 +156,7 @@ export class SuppliersService {
             eq(supplierFiles.supplierId, supplierId),
           ),
         )
-        .orderBy(asc(supplierFiles.kind), desc(supplierFiles.datedOn)),
+        .orderBy(asc(supplierFiles.kind), sql`${supplierFiles.datedOn} desc nulls last`),
       this.reviews(organizationId, supplierId),
       this.db
         .select({ id: assets.id, name: assets.name })
@@ -214,7 +226,7 @@ export class SuppliersService {
   }
 
   async create(member: CurrentMember, input: SupplierInput) {
-    const ownerName = await ownerNameOf(this.db, member.organizationId, input.ownerId);
+    const ownerName = await optionalOwnerNameOf(this.db, member.organizationId, input.ownerId);
     const number = await this.db.transaction(async (tx) => {
       const next = await nextNumber(tx, member.organizationId, suppliers);
       const [supplier] = await tx
@@ -232,7 +244,7 @@ export class SuppliersService {
   }
 
   async update(member: CurrentMember, ref: string, input: SupplierInput) {
-    const ownerName = await ownerNameOf(this.db, member.organizationId, input.ownerId);
+    const ownerName = await optionalOwnerNameOf(this.db, member.organizationId, input.ownerId);
     const row = await this.findActive(member.organizationId, ref);
     const before = this.snapshot(row.supplier, row.ownerName);
     const after = this.snapshot(input, ownerName);
@@ -498,7 +510,7 @@ export class SuppliersService {
   }
 
   /** What the Audit trail keeps of a Supplier. */
-  private snapshot(supplier: SupplierInput | SupplierRow, ownerName: string) {
+  private snapshot(supplier: SupplierInput | SupplierRow, ownerName: string | null) {
     return {
       name: supplier.name,
       provides: supplier.provides,
@@ -506,6 +518,7 @@ export class SuppliersService {
       criticality: supplier.criticality,
       handlesPersonalData: supplier.handlesPersonalData,
       contact: supplier.contact,
+      contractTerm: supplier.contractTerm,
       contractEnds: supplier.contractEnds,
       exitPlan: supplier.exitPlan,
       nextReviewOn: supplier.nextReviewOn,
@@ -516,8 +529,8 @@ export class SuppliersService {
     return this.db
       .select({ supplier: suppliers, ownerName: users.name })
       .from(suppliers)
-      .innerJoin(members, eq(members.id, suppliers.ownerId))
-      .innerJoin(users, eq(users.id, members.userId))
+      .leftJoin(members, eq(members.id, suppliers.ownerId))
+      .leftJoin(users, eq(users.id, members.userId))
       .where(and(eq(suppliers.organizationId, organizationId), isNull(suppliers.deletedAt), filter))
       .orderBy(asc(suppliers.number));
   }
@@ -553,7 +566,7 @@ export class SuppliersService {
   }
 
   private summary(
-    { supplier, ownerName }: { supplier: SupplierRow; ownerName: string },
+    { supplier, ownerName }: { supplier: SupplierRow; ownerName: string | null },
     files: FileRow[],
     reviews: { review: ReviewRow }[],
     assetCount: number,
@@ -569,6 +582,7 @@ export class SuppliersService {
       criticality: supplier.criticality,
       handlesPersonalData: supplier.handlesPersonalData,
       contact: supplier.contact,
+      contractTerm: supplier.contractTerm,
       contractEnds: supplier.contractEnds,
       exitPlan: supplier.exitPlan,
       nextReviewOn: supplier.nextReviewOn,

@@ -1,9 +1,11 @@
+import { yesNoFromForm } from '@/components/owner-select';
 import type { State } from '@/components/state-badge';
 import type { AuditEvent } from '@/lib/audit';
 import type { StoredFile } from '@/lib/files';
 import type { RiskDecision } from '@/lib/risks';
 
 export type SupplierCriticality = 'low' | 'medium' | 'high';
+export type ContractTerm = 'fixed' | 'rolling';
 export type SupplierFileKind =
   | 'contract'
   | 'data_processing_agreement'
@@ -17,6 +19,17 @@ export const criticalityLabels: Record<SupplierCriticality, string> = {
   medium: 'Medium',
   high: 'High',
 };
+
+export const contractTermLabels: Record<ContractTerm, string> = {
+  fixed: 'Ends on a date',
+  rolling: 'Rolls on until notice',
+};
+
+/** What the register says about when the contract ends. */
+export function contractEndLabel(supplier: Pick<Supplier, 'contractTerm' | 'contractEnds'>) {
+  if (supplier.contractTerm === 'fixed') return supplier.contractEnds!;
+  return supplier.contractTerm === 'rolling' ? 'Rolling' : 'Unknown';
+}
 
 export const fileKindLabels: Record<SupplierFileKind, string> = {
   contract: 'Contract',
@@ -36,11 +49,14 @@ export interface Supplier {
   ref: string;
   name: string;
   provides: string;
-  ownerId: string;
-  ownerName: string;
-  criticality: SupplierCriticality;
-  handlesPersonalData: boolean;
+  /** Null while unassigned. The facts below are null while nobody knows them. */
+  ownerId: string | null;
+  ownerName: string | null;
+  criticality: SupplierCriticality | null;
+  handlesPersonalData: boolean | null;
   contact: string;
+  contractTerm: ContractTerm | null;
+  /** Set when the contract term is fixed. */
   contractEnds: string | null;
   exitPlan: string;
   nextReviewOn: string;
@@ -57,7 +73,8 @@ export interface SupplierFile {
   title: string;
   location: string | null;
   upload: StoredFile | null;
-  datedOn: string;
+  /** Null when the date on the paperwork isn't known. */
+  datedOn: string | null;
   expiresOn: string | null;
   state: State<'evidence'>;
 }
@@ -84,10 +101,11 @@ export function supplierPayload(form: FormData) {
   return {
     name: form.get('name'),
     provides: form.get('provides'),
-    ownerId: form.get('ownerId'),
-    criticality: form.get('criticality'),
-    handlesPersonalData: form.get('handlesPersonalData') === 'yes',
+    ownerId: form.get('ownerId') || null,
+    criticality: form.get('criticality') || null,
+    handlesPersonalData: yesNoFromForm(form.get('handlesPersonalData')),
     contact: form.get('contact'),
+    contractTerm: form.get('contractTerm') || null,
     contractEnds: form.get('contractEnds') || null,
     exitPlan: form.get('exitPlan'),
     nextReviewOn: form.get('nextReviewOn'),
