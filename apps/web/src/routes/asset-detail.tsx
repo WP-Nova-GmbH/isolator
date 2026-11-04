@@ -1,25 +1,32 @@
 import {
-  Form,
   Link,
   redirect,
   useActionData,
   useLoaderData,
-  useNavigation,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
 } from 'react-router';
 import { AssetFields } from '@/components/asset-fields';
 import { DetailLayout } from '@/components/detail-layout';
+import { Fact, Facts } from '@/components/facts';
+import { EditDialog } from '@/components/form-dialog';
 import { FormError } from '@/components/form-error';
 import { HistoryList } from '@/components/history-list';
 import { LifecycleCard, type LifecycleAction } from '@/components/lifecycle-card';
+import { UNASSIGNED, UNKNOWN } from '@/components/owner-select';
 import { PageHeader } from '@/components/page-header';
-import { Ref } from '@/components/table-parts';
+import { RecordLink, Ref } from '@/components/table-parts';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { api, attempt } from '@/lib/api';
-import { assetPayload, type AssetDetail as Asset } from '@/lib/assets';
+import {
+  assetPayload,
+  assetStatusLabels,
+  assetTypeLabels,
+  classificationLabels,
+  validationLabels,
+  type AssetDetail as Asset,
+} from '@/lib/assets';
 import { historyItems } from '@/lib/audit';
 import { usePermissions } from '@/lib/members';
 import type { Supplier } from '@/lib/suppliers';
@@ -93,14 +100,23 @@ function lifecycleProps(asset: Asset) {
 export function AssetDetail() {
   const { asset, suppliers } = useLoaderData<typeof assetDetailLoader>();
   const result = useActionData<typeof assetDetailAction>();
-  const navigation = useNavigation();
   const retired = asset.retiredAt !== null;
   const { canEdit } = usePermissions();
   const locked = retired || !canEdit;
 
   return (
     <>
-      <PageHeader title={asset.name} back={{ to: '/assets', label: 'Assets' }} />
+      <PageHeader
+        title={asset.name}
+        back={{ to: '/assets', label: 'Assets' }}
+        actions={
+          !locked && (
+            <EditDialog title="Edit asset">
+              <AssetFields asset={asset} suppliers={suppliers} />
+            </EditDialog>
+          )
+        }
+      />
       <FormError message={result?.error} />
       {retired && (
         <Alert>
@@ -120,24 +136,42 @@ export function AssetDetail() {
           </>
         }
       >
-        <Form method="post" className="flex flex-col gap-6">
-          <fieldset disabled={locked} className="contents">
-            <AssetFields key={asset.id} asset={asset} suppliers={suppliers} />
-          </fieldset>
-          {!locked && (
-            <div>
-              <Button
-                type="submit"
-                name="intent"
-                value="save"
-                variant="outline"
-                disabled={navigation.state !== 'idle'}
-              >
-                Save changes
-              </Button>
-            </div>
-          )}
-        </Form>
+        <Card aria-label="Asset">
+          <Facts>
+            <Fact label="Type">{assetTypeLabels[asset.type]}</Fact>
+            <Fact label="Status">{assetStatusLabels[asset.status]}</Fact>
+            <Fact label="Classification" empty={UNKNOWN}>
+              {asset.classification && classificationLabels[asset.classification]}
+            </Fact>
+            <Fact label="Business owner" empty={UNASSIGNED}>
+              {asset.ownerName}
+            </Fact>
+            <Fact label="Technical owner" empty={UNASSIGNED}>
+              {asset.technicalOwnerName}
+            </Fact>
+            <Fact label="Supplier that provides it" empty="None">
+              {asset.supplier && (
+                <RecordLink to={`/suppliers/${asset.supplier.ref}`} className="font-normal">
+                  {asset.supplier.name}
+                </RecordLink>
+              )}
+            </Fact>
+            <Fact label="Locations: offices, data centres, cloud regions" wide>
+              {asset.location}
+            </Fact>
+          </Facts>
+        </Card>
+
+        <Card aria-label="Record" className="flex flex-col gap-4">
+          <h2>Record</h2>
+          <Facts>
+            <Fact label="Validation">{validationLabels[asset.validation]}</Fact>
+            <Fact label="Source: where this record comes from">{asset.source}</Fact>
+            <Fact label="Notes" empty="None" wide>
+              {asset.notes}
+            </Fact>
+          </Facts>
+        </Card>
 
         <Card aria-label="Open risks" className="flex flex-col gap-3">
           <h2>Open risks</h2>

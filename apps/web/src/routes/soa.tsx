@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLoaderData, type ActionFunctionArgs } from 'react-router';
 import { Field } from '@/components/field';
+import { FormDialog, FormDialogBody, FormDialogFooter } from '@/components/form-dialog';
 import { FormError } from '@/components/form-error';
 import { PageHeader } from '@/components/page-header';
 import { StatGrid, StatTile } from '@/components/stat-tile';
@@ -8,7 +9,6 @@ import { StateBadge } from '@/components/state-badge';
 import { TabNav, useTabFilter } from '@/components/tab-nav';
 import { DataCell, EmptyRow, MainCell, RecordLink, Ref } from '@/components/table-parts';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -61,22 +61,21 @@ function OwnControlForm({ onClose }: { onClose: () => void }) {
   const fetcher = useFormFetcher(onClose);
 
   return (
-    <Card aria-label="Add own control">
-      <fetcher.Form method="post" className="flex flex-col gap-4">
-        <FormError message={fetcher.data?.error} />
-        <Field label="What the control is" htmlFor="own-title">
-          <Input id="own-title" name="title" required autoFocus />
-        </Field>
-        <div className="flex items-center gap-2">
+    <FormDialog title="Add own control" onClose={onClose}>
+      <fetcher.Form method="post" className="contents">
+        <FormDialogBody>
+          <FormError message={fetcher.data?.error} />
+          <Field label="What the control is" htmlFor="own-title">
+            <Input id="own-title" name="title" required autoFocus />
+          </Field>
+        </FormDialogBody>
+        <FormDialogFooter>
           <Button type="submit" disabled={fetcher.state !== 'idle'}>
             Add control
           </Button>
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-        </div>
+        </FormDialogFooter>
       </fetcher.Form>
-    </Card>
+    </FormDialog>
   );
 }
 

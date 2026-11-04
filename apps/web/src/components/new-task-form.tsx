@@ -1,7 +1,7 @@
 import { Field, FieldGrid } from '@/components/field';
+import { FormDialog, FormDialogBody, FormDialogFooter } from '@/components/form-dialog';
 import { OwnerSelect } from '@/components/owner-select';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { useAppData } from '@/lib/members';
@@ -24,48 +24,47 @@ export function NewTaskForm({ targets, onClose }: NewTaskFormProps) {
   const saving = fetcher.state !== 'idle';
 
   return (
-    <Card aria-label="New Task">
-      <fetcher.Form method="post" className="flex flex-col gap-4">
-        <FormError message={fetcher.data?.error} />
-        <Field label="What needs doing" htmlFor="task-title">
-          <Input id="task-title" name="title" required autoFocus />
-        </Field>
-        <FieldGrid>
-          {targets && (
-            <Field label="Belongs to" htmlFor="task-target">
-              <NativeSelect id="task-target" name="target" required>
-                {targets.map(({ group, options }) => (
-                  <optgroup key={group} label={group}>
-                    {options.map(({ value, label }) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </NativeSelect>
+    <FormDialog title="New Task" size="lg" onClose={onClose}>
+      <fetcher.Form method="post" className="contents">
+        <FormDialogBody>
+          <FormError message={fetcher.data?.error} />
+          <Field label="What needs doing" htmlFor="task-title">
+            <Input id="task-title" name="title" required autoFocus />
+          </Field>
+          <FieldGrid>
+            {targets && (
+              <Field label="Belongs to" htmlFor="task-target">
+                <NativeSelect id="task-target" name="target" required>
+                  {targets.map(({ group, options }) => (
+                    <optgroup key={group} label={group}>
+                      {options.map(({ value, label }) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </NativeSelect>
+              </Field>
+            )}
+            <Field label="Owner" htmlFor="task-owner">
+              <OwnerSelect
+                id="task-owner"
+                name="ownerId"
+                defaultValue={me.id}
+                unassigned
+                required
+              />
             </Field>
-          )}
-          <Field label="Owner" htmlFor="task-owner">
-            <OwnerSelect
-              id="task-owner"
-              name="ownerId"
-              defaultValue={me.id}
-              unassigned
-              required
-            />
-          </Field>
-          <Field label="Due" htmlFor="task-due">
-            <Input id="task-due" name="dueOn" type="date" required />
-          </Field>
-        </FieldGrid>
-        <p className="text-xs text-muted-foreground">
-          Not agreed yet? Propose it. The owner and due date can wait until someone commits to it.
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button type="submit" name="intent" value="add-task" disabled={saving}>
-            Add Task
-          </Button>
+            <Field label="Due" htmlFor="task-due">
+              <Input id="task-due" name="dueOn" type="date" required />
+            </Field>
+          </FieldGrid>
+          <p className="text-xs text-muted-foreground">
+            Not agreed yet? Propose it. The owner and due date can wait until someone commits to it.
+          </p>
+        </FormDialogBody>
+        <FormDialogFooter>
           <Button
             type="submit"
             name="intent"
@@ -76,11 +75,11 @@ export function NewTaskForm({ targets, onClose }: NewTaskFormProps) {
           >
             Propose Task
           </Button>
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
+          <Button type="submit" name="intent" value="add-task" disabled={saving}>
+            Add Task
           </Button>
-        </div>
+        </FormDialogFooter>
       </fetcher.Form>
-    </Card>
+    </FormDialog>
   );
 }

@@ -1,25 +1,25 @@
 import { useState } from 'react';
 import { XIcon } from 'lucide-react';
 import {
-  Form,
   Link,
   redirect,
   useActionData,
   useFetcher,
   useLoaderData,
-  useNavigation,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
 } from 'react-router';
 import { DetailLayout } from '@/components/detail-layout';
 import { DownloadButton } from '@/components/download-button';
+import { Fact, Facts } from '@/components/facts';
 import { Field, FieldGrid } from '@/components/field';
+import { EditDialog, FormDialog, FormDialogBody, FormDialogFooter } from '@/components/form-dialog';
 import { FormError } from '@/components/form-error';
 import { HistoryList } from '@/components/history-list';
 import { LifecycleCard, type LifecycleAction } from '@/components/lifecycle-card';
 import { LinkedItem, LinkPicker } from '@/components/link-picker';
 import { NewTaskForm } from '@/components/new-task-form';
-import { UNKNOWN } from '@/components/owner-select';
+import { UNASSIGNED, UNKNOWN, yesNoLabel } from '@/components/owner-select';
 import { PageHeader, SectionHeader } from '@/components/page-header';
 import { RiskScore } from '@/components/risk-score';
 import { StateBadge } from '@/components/state-badge';
@@ -48,6 +48,8 @@ import { aYearFromNow, todayIso } from '@/lib/dates';
 import { withUpload } from '@/lib/files';
 import { currentScore, toTask, type ApiTask } from '@/lib/risks';
 import {
+  contractTermLabels,
+  criticalityLabels,
   fileKindLabels,
   reviewOutcomeLabels,
   supplierPayload,
@@ -203,40 +205,42 @@ function FileForm({ onClose }: { onClose: () => void }) {
   const fetcher = useFormFetcher(onClose);
 
   return (
-    <Card aria-label="Add a file">
-      <fetcher.Form method="post" encType="multipart/form-data" className="flex flex-col gap-4">
-        <FormError message={fetcher.data?.error} />
-        <FieldGrid>
-          <Field label="Kind" htmlFor="file-kind">
-            <NativeSelect id="file-kind" name="kind">
-              {Object.entries(fileKindLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field label="Name, if not the file's own" htmlFor="file-title">
-            <Input id="file-title" name="title" autoFocus />
-          </Field>
-        </FieldGrid>
-        <FieldGrid>
-          <Field label="Upload, up to 25 MB" htmlFor="file-upload">
-            <Input id="file-upload" name="upload" type="file" className="py-1.5" />
-          </Field>
-          <Field label="Or where it is kept: a link or a folder" htmlFor="file-location">
-            <Input id="file-location" name="location" />
-          </Field>
-        </FieldGrid>
-        <FieldGrid>
-          <Field label="Dated, if known" htmlFor="file-dated">
-            <Input id="file-dated" name="datedOn" type="date" />
-          </Field>
-          <Field label="Expires, if it does" htmlFor="file-expires">
-            <Input id="file-expires" name="expiresOn" type="date" />
-          </Field>
-        </FieldGrid>
-        <div className="flex items-center gap-2">
+    <FormDialog title="Add a file" size="lg" onClose={onClose}>
+      <fetcher.Form method="post" encType="multipart/form-data" className="contents">
+        <FormDialogBody>
+          <FormError message={fetcher.data?.error} />
+          <FieldGrid>
+            <Field label="Kind" htmlFor="file-kind">
+              <NativeSelect id="file-kind" name="kind">
+                {Object.entries(fileKindLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </NativeSelect>
+            </Field>
+            <Field label="Name, if not the file's own" htmlFor="file-title">
+              <Input id="file-title" name="title" autoFocus />
+            </Field>
+          </FieldGrid>
+          <FieldGrid>
+            <Field label="Upload, up to 25 MB" htmlFor="file-upload">
+              <Input id="file-upload" name="upload" type="file" className="py-1.5" />
+            </Field>
+            <Field label="Or where it is kept: a link or a folder" htmlFor="file-location">
+              <Input id="file-location" name="location" />
+            </Field>
+          </FieldGrid>
+          <FieldGrid>
+            <Field label="Dated, if known" htmlFor="file-dated">
+              <Input id="file-dated" name="datedOn" type="date" />
+            </Field>
+            <Field label="Expires, if it does" htmlFor="file-expires">
+              <Input id="file-expires" name="expiresOn" type="date" />
+            </Field>
+          </FieldGrid>
+        </FormDialogBody>
+        <FormDialogFooter>
           <Button
             type="submit"
             name="intent"
@@ -245,12 +249,9 @@ function FileForm({ onClose }: { onClose: () => void }) {
           >
             Add file
           </Button>
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-        </div>
+        </FormDialogFooter>
       </fetcher.Form>
-    </Card>
+    </FormDialog>
   );
 }
 
@@ -258,43 +259,45 @@ function ReviewForm({ onClose }: { onClose: () => void }) {
   const fetcher = useFormFetcher(onClose);
 
   return (
-    <Card aria-label="Record a review">
-      <fetcher.Form method="post" className="flex flex-col gap-4">
-        <FormError message={fetcher.data?.error} />
-        <FieldGrid>
-          <Field label="Reviewed on" htmlFor="review-date">
-            <Input
-              id="review-date"
-              name="reviewedOn"
-              type="date"
-              max={todayIso()}
-              defaultValue={todayIso()}
-              required
-            />
+    <FormDialog title="Record a review" size="lg" onClose={onClose}>
+      <fetcher.Form method="post" className="contents">
+        <FormDialogBody>
+          <FormError message={fetcher.data?.error} />
+          <FieldGrid>
+            <Field label="Reviewed on" htmlFor="review-date">
+              <Input
+                id="review-date"
+                name="reviewedOn"
+                type="date"
+                max={todayIso()}
+                defaultValue={todayIso()}
+                required
+              />
+            </Field>
+            <Field label="Outcome" htmlFor="review-outcome">
+              <NativeSelect id="review-outcome" name="outcome">
+                {Object.entries(reviewOutcomeLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </NativeSelect>
+            </Field>
+            <Field label="Next review" htmlFor="review-next">
+              <Input
+                id="review-next"
+                name="nextReviewOn"
+                type="date"
+                defaultValue={aYearFromNow()}
+                required
+              />
+            </Field>
+          </FieldGrid>
+          <Field label="What you checked and what you found" htmlFor="review-notes">
+            <Textarea id="review-notes" name="notes" required autoFocus />
           </Field>
-          <Field label="Outcome" htmlFor="review-outcome">
-            <NativeSelect id="review-outcome" name="outcome">
-              {Object.entries(reviewOutcomeLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field label="Next review" htmlFor="review-next">
-            <Input
-              id="review-next"
-              name="nextReviewOn"
-              type="date"
-              defaultValue={aYearFromNow()}
-              required
-            />
-          </Field>
-        </FieldGrid>
-        <Field label="What you checked and what you found" htmlFor="review-notes">
-          <Textarea id="review-notes" name="notes" required autoFocus />
-        </Field>
-        <div className="flex items-center gap-2">
+        </FormDialogBody>
+        <FormDialogFooter>
           <Button
             type="submit"
             name="intent"
@@ -303,19 +306,15 @@ function ReviewForm({ onClose }: { onClose: () => void }) {
           >
             Record review
           </Button>
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-        </div>
+        </FormDialogFooter>
       </fetcher.Form>
-    </Card>
+    </FormDialog>
   );
 }
 
 export function SupplierDetail() {
   const { supplier, tasks, assets } = useLoaderData<typeof supplierDetailLoader>();
   const result = useActionData<typeof supplierDetailAction>();
-  const navigation = useNavigation();
   const [adding, setAdding] = useState<'file' | 'review' | 'task' | null>(null);
   const ended = supplier.endedAt !== null;
   const { canEdit } = usePermissions();
@@ -327,7 +326,16 @@ export function SupplierDetail() {
         title={supplier.name}
         eyebrow={<Ref>{supplier.ref}</Ref>}
         back={{ to: '/suppliers', label: 'Suppliers' }}
-        actions={<StateBadge kind="supplier" state={supplier.state} />}
+        actions={
+          <>
+            <StateBadge kind="supplier" state={supplier.state} />
+            {!locked && (
+              <EditDialog title="Edit Supplier">
+                <SupplierFields supplier={supplier} />
+              </EditDialog>
+            )}
+          </>
+        }
       />
       <FormError message={result?.error} />
       {ended && (
@@ -362,25 +370,39 @@ export function SupplierDetail() {
           </>
         }
       >
-        <Form id="supplier-form" method="post" className="flex flex-col gap-6">
-          <fieldset disabled={locked} className="contents">
-            {/* A new review moves the next review date, so the fields start again from it. */}
-            <SupplierFields key={supplier.nextReviewOn} supplier={supplier} />
-          </fieldset>
-          {!locked && (
-            <div>
-              <Button
-                type="submit"
-                name="intent"
-                value="save"
-                variant="outline"
-                disabled={navigation.state !== 'idle'}
-              >
-                Save changes
-              </Button>
-            </div>
-          )}
-        </Form>
+        <Card aria-label="Supplier">
+          <Facts>
+            <Fact label="What they provide" wide>
+              {supplier.provides}
+            </Fact>
+            <Fact label="Owner" empty={UNASSIGNED}>
+              {supplier.ownerName}
+            </Fact>
+            <Fact label="Criticality" empty={UNKNOWN}>
+              {supplier.criticality && criticalityLabels[supplier.criticality]}
+            </Fact>
+            <Fact label="Handles personal data" empty={UNKNOWN}>
+              {yesNoLabel(supplier.handlesPersonalData)}
+            </Fact>
+          </Facts>
+        </Card>
+
+        <Card aria-label="Contract and contact" className="flex flex-col gap-4">
+          <h2>Contract and contact</h2>
+          <Facts>
+            <Fact label="Contract term" empty={UNKNOWN}>
+              {supplier.contractTerm && contractTermLabels[supplier.contractTerm]}
+            </Fact>
+            {supplier.contractTerm === 'fixed' && (
+              <Fact label="Contract ends">{supplier.contractEnds}</Fact>
+            )}
+            <Fact label="Next review">{supplier.nextReviewOn}</Fact>
+            <Fact label="Who to contact about a security problem">{supplier.contact}</Fact>
+            <Fact label="Exit plan: what you do if they go away" empty="None yet" wide>
+              {supplier.exitPlan}
+            </Fact>
+          </Facts>
+        </Card>
 
         <section className="flex flex-col gap-3">
           <SectionHeader title="Contracts and certificates">

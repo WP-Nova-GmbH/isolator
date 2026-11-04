@@ -1,6 +1,5 @@
-import { Field, FieldGrid } from '@/components/field';
+import { Field, FieldGrid, FieldSection } from '@/components/field';
 import { OwnerSelect, UNKNOWN } from '@/components/owner-select';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
@@ -33,7 +32,7 @@ export function AssetFields({ asset, suppliers }: AssetFieldsProps) {
 
   return (
     <>
-      <Card aria-label="Asset" className="flex flex-col gap-4">
+      <FieldSection label="Asset">
         <Field label="Name" htmlFor="name">
           <Input id="name" name="name" defaultValue={asset?.name} required />
         </Field>
@@ -92,10 +91,9 @@ export function AssetFields({ asset, suppliers }: AssetFieldsProps) {
         <Field label="Locations: offices, data centres, cloud regions" htmlFor="location">
           <Input id="location" name="location" defaultValue={asset?.location} />
         </Field>
-      </Card>
+      </FieldSection>
 
-      <Card aria-label="Record" className="flex flex-col gap-4">
-        <h2>Record</h2>
+      <FieldSection title="Record">
         <FieldGrid>
           <Field label="Validation" htmlFor="validation">
             <NativeSelect
@@ -118,7 +116,7 @@ export function AssetFields({ asset, suppliers }: AssetFieldsProps) {
         <Field label="Notes" htmlFor="notes">
           <Textarea id="notes" name="notes" defaultValue={asset?.notes} />
         </Field>
-      </Card>
+      </FieldSection>
     </>
   );
 }

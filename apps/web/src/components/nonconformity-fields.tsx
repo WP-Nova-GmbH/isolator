@@ -1,6 +1,5 @@
-import { Field, FieldGrid } from '@/components/field';
+import { Field, FieldGrid, FieldSection } from '@/components/field';
 import { OwnerSelect } from '@/components/owner-select';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { todayIso } from '@/lib/dates';
@@ -12,7 +11,7 @@ export function NonconformityFields({ nonconformity }: { nonconformity?: Nonconf
   const { me } = useAppData();
 
   return (
-    <Card aria-label="Nonconformity" className="flex flex-col gap-4">
+    <FieldSection label="Nonconformity">
       <Field label="What falls short" htmlFor="title">
         <Input id="title" name="title" defaultValue={nonconformity?.title} required />
       </Field>
@@ -44,6 +43,6 @@ export function NonconformityFields({ nonconformity }: { nonconformity?: Nonconf
       <Field label="What caused it, needed before you can close it" htmlFor="cause">
         <Textarea id="cause" name="cause" defaultValue={nonconformity?.cause} />
       </Field>
-    </Card>
+    </FieldSection>
   );
 }

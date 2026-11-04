@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import { Form } from 'react-router';
+import { Field } from '@/components/field';
+import { FormDialog, FormDialogBody, FormDialogFooter } from '@/components/form-dialog';
+import { FormError } from '@/components/form-error';
 import { OwnerSelect } from '@/components/owner-select';
 import { StateBadge } from '@/components/state-badge';
 import { DataCell, EmptyRow, MainCell, RecordLink, Ref } from '@/components/table-parts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Table,
   TableBody,
@@ -15,6 +19,7 @@ import {
 } from '@/components/ui/table';
 import { usePermissions } from '@/lib/members';
 import type { Task } from '@/lib/tasks';
+import { useFormFetcher } from '@/lib/use-form-fetcher';
 
 interface TasksTableProps {
   tasks: Task[];
@@ -29,69 +34,86 @@ interface TasksTableProps {
 }
 
 /** Agrees who does a proposed Task and by when. */
-function CommitForm({ task, onCancel }: { task: Task; onCancel: () => void }) {
+function CommitDialog({ task, onClose }: { task: Task; onClose: () => void }) {
+  const fetcher = useFormFetcher(onClose);
+
   return (
-    <Form method="post" preventScrollReset className="flex items-center justify-end gap-1">
-      <input type="hidden" name="id" value={task.id} />
-      <div className="w-40">
-        <OwnerSelect
-          id={`commit-owner-${task.id}`}
-          name="ownerId"
-          aria-label="Owner"
-          defaultValue={task.ownerId ?? null}
-          className="h-7"
-          unassigned
-          required
-        />
-      </div>
-      <Input
-        name="dueOn"
-        type="date"
-        aria-label="Due"
-        defaultValue={task.dueOn ?? ''}
-        className="h-7 w-36"
-        required
-      />
-      <Button type="submit" name="intent" value="commit-task" size="xs">
-        Commit
-      </Button>
-      <Button type="button" variant="ghost" size="xs" onClick={onCancel}>
-        Back
-      </Button>
-    </Form>
+    <FormDialog title="Commit to this Task" description={task.title} onClose={onClose}>
+      <fetcher.Form method="post" preventScrollReset className="contents">
+        <FormDialogBody>
+          <FormError message={fetcher.data?.error} />
+          <input type="hidden" name="id" value={task.id} />
+          <Field label="Owner" htmlFor={`commit-owner-${task.id}`}>
+            <OwnerSelect
+              id={`commit-owner-${task.id}`}
+              name="ownerId"
+              defaultValue={task.ownerId ?? null}
+              unassigned
+              required
+            />
+          </Field>
+          <Field label="Due" htmlFor={`commit-due-${task.id}`}>
+            <Input
+              id={`commit-due-${task.id}`}
+              name="dueOn"
+              type="date"
+              defaultValue={task.dueOn ?? ''}
+              required
+            />
+          </Field>
+        </FormDialogBody>
+        <FormDialogFooter>
+          <Button
+            type="submit"
+            name="intent"
+            value="commit-task"
+            disabled={fetcher.state !== 'idle'}
+          >
+            Commit
+          </Button>
+        </FormDialogFooter>
+      </fetcher.Form>
+    </FormDialog>
+  );
+}
+
+function CancelDialog({ task, onClose }: { task: Task; onClose: () => void }) {
+  const fetcher = useFormFetcher(onClose);
+
+  return (
+    <FormDialog title="Cancel Task" description={task.title} onClose={onClose}>
+      <fetcher.Form method="post" preventScrollReset className="contents">
+        <FormDialogBody>
+          <FormError message={fetcher.data?.error} />
+          <input type="hidden" name="id" value={task.id} />
+          <Field label="Why is it no longer needed?" htmlFor={`cancel-reason-${task.id}`}>
+            <Textarea id={`cancel-reason-${task.id}`} name="reason" required autoFocus />
+          </Field>
+        </FormDialogBody>
+        <FormDialogFooter cancelLabel="Keep Task">
+          <Button
+            type="submit"
+            name="intent"
+            value="cancel-task"
+            variant="destructive"
+            disabled={fetcher.state !== 'idle'}
+          >
+            Cancel Task
+          </Button>
+        </FormDialogFooter>
+      </fetcher.Form>
+    </FormDialog>
   );
 }
 
 function TaskActions({ task }: { task: Task }) {
-  const [cancelling, setCancelling] = useState(false);
-  const [committing, setCommitting] = useState(false);
+  const [open, setOpen] = useState<'commit' | 'cancel' | null>(null);
+  const close = () => setOpen(null);
 
-  if (committing) return <CommitForm task={task} onCancel={() => setCommitting(false)} />;
-  if (cancelling) {
-    return (
-      <Form method="post" preventScrollReset className="flex items-center justify-end gap-1">
-        <input type="hidden" name="id" value={task.id} />
-        <Input
-          name="reason"
-          aria-label="Why is this Task no longer needed?"
-          placeholder="Why is it no longer needed?"
-          className="h-7 w-56"
-          required
-          autoFocus
-        />
-        <Button type="submit" name="intent" value="cancel-task" variant="destructive" size="xs">
-          Cancel Task
-        </Button>
-        <Button type="button" variant="ghost" size="xs" onClick={() => setCancelling(false)}>
-          Keep
-        </Button>
-      </Form>
-    );
-  }
   return (
     <div className="flex items-center justify-end gap-1">
       {task.state === 'Proposed' ? (
-        <Button type="button" variant="ghost" size="xs" onClick={() => setCommitting(true)}>
+        <Button type="button" variant="ghost" size="xs" onClick={() => setOpen('commit')}>
           Commit
         </Button>
       ) : (
@@ -102,9 +124,11 @@ function TaskActions({ task }: { task: Task }) {
           </Button>
         </Form>
       )}
-      <Button type="button" variant="ghost" size="xs" onClick={() => setCancelling(true)}>
+      <Button type="button" variant="ghost" size="xs" onClick={() => setOpen('cancel')}>
         Cancel
       </Button>
+      {open === 'commit' && <CommitDialog task={task} onClose={close} />}
+      {open === 'cancel' && <CancelDialog task={task} onClose={close} />}
     </div>
   );
 }

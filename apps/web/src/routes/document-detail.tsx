@@ -13,7 +13,9 @@ import { ConfirmationCard } from '@/components/confirmation-card';
 import { DetailLayout } from '@/components/detail-layout';
 import { DocumentFields } from '@/components/document-fields';
 import { DownloadButton } from '@/components/download-button';
+import { Fact, Facts } from '@/components/facts';
 import { Field } from '@/components/field';
+import { EditDialog, FormDialog, FormDialogBody, FormDialogFooter } from '@/components/form-dialog';
 import { FormError } from '@/components/form-error';
 import { HistoryList } from '@/components/history-list';
 import { LifecycleCard, type LifecycleAction } from '@/components/lifecycle-card';
@@ -56,9 +58,6 @@ export async function documentDetailAction({ request, params }: ActionFunctionAr
       case 'save':
         return api(path, { method: 'PUT', body: documentPayload(form) });
       case 'confirm':
-        // Saves first, so what is on screen is what gets confirmed. A Reviewer's form is locked
-        // and sends no fields, so there is nothing to save.
-        if (form.has('title')) await api(path, { method: 'PUT', body: documentPayload(form) });
         return api(`${path}/confirmations`, { method: 'POST' });
       case 'start-version':
         return api(`${path}/versions`, { method: 'POST' });
@@ -87,7 +86,6 @@ function confirmationProps(doc: IsmsDocument) {
       ? `Version ${doc.versionInForce} stays in force until you confirm version ${doc.version}.`
       : `Version ${doc.version} takes effect when you confirm it.`,
     action: `Confirm version ${doc.version}`,
-    form: 'document-form',
   };
 }
 
@@ -138,40 +136,47 @@ function versionItems(doc: IsmsDocument) {
   }));
 }
 
-function FileForm({ onClose }: { onClose: () => void }) {
+function FileForm({ title, onClose }: { title: string; onClose: () => void }) {
   const fetcher = useFormFetcher(onClose);
 
   return (
-    <fetcher.Form method="post" encType="multipart/form-data" className="flex flex-col gap-3">
-      <FormError message={fetcher.data?.error} />
-      <Field label="File, up to 25 MB" htmlFor="document-upload">
-        <Input id="document-upload" name="upload" type="file" className="py-1.5" required />
-      </Field>
-      <div className="flex items-center gap-2">
-        <Button type="submit" name="intent" value="upload-file" disabled={fetcher.state !== 'idle'}>
-          Upload file
-        </Button>
-        <Button type="button" variant="ghost" onClick={onClose}>
-          Cancel
-        </Button>
-      </div>
-    </fetcher.Form>
+    <FormDialog title={title} onClose={onClose}>
+      <fetcher.Form method="post" encType="multipart/form-data" className="contents">
+        <FormDialogBody>
+          <FormError message={fetcher.data?.error} />
+          <Field label="File, up to 25 MB" htmlFor="document-upload">
+            <Input id="document-upload" name="upload" type="file" className="py-1.5" required />
+          </Field>
+        </FormDialogBody>
+        <FormDialogFooter>
+          <Button
+            type="submit"
+            name="intent"
+            value="upload-file"
+            disabled={fetcher.state !== 'idle'}
+          >
+            {title}
+          </Button>
+        </FormDialogFooter>
+      </fetcher.Form>
+    </FormDialog>
   );
 }
 
 function FileCard({ doc, editable }: { doc: IsmsDocument; editable: boolean }) {
   const [uploading, setUploading] = useState(false);
+  const action = doc.upload ? 'Replace file' : 'Upload file';
 
   return (
     <Card aria-label="File" className="flex flex-col gap-3">
       <SectionHeader title={`File for version ${doc.version}`}>
-        {editable && !uploading && (
+        {editable && (
           <Button type="button" variant="outline" onClick={() => setUploading(true)}>
-            {doc.upload ? 'Replace file' : 'Upload file'}
+            {action}
           </Button>
         )}
       </SectionHeader>
-      {uploading && <FileForm onClose={() => setUploading(false)} />}
+      {uploading && <FileForm title={action} onClose={() => setUploading(false)} />}
       {doc.upload ? (
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
@@ -186,7 +191,7 @@ function FileCard({ doc, editable }: { doc: IsmsDocument; editable: boolean }) {
           )}
         </div>
       ) : (
-        !uploading && <p className="text-muted-foreground">No file for this version.</p>
+        <p className="text-muted-foreground">No file for this version.</p>
       )}
     </Card>
   );
@@ -211,7 +216,16 @@ export function DocumentDetail() {
           </div>
         }
         back={{ to: '/documents', label: 'Documents' }}
-        actions={<StateBadge kind="document" state={doc.state} />}
+        actions={
+          <>
+            <StateBadge kind="document" state={doc.state} />
+            {!locked && (
+              <EditDialog title={`Edit version ${doc.version}`} size="xl">
+                <DocumentFields document={doc} contentLocked={!draft} />
+              </EditDialog>
+            )}
+          </>
+        }
       />
       <FormError message={result?.error} />
       {withdrawn && (
@@ -275,24 +289,23 @@ export function DocumentDetail() {
           </>
         }
       >
-        <Form id="document-form" method="post" className="flex flex-col gap-6">
-          <fieldset disabled={locked} className="contents">
-            <DocumentFields key={doc.version} document={doc} contentLocked={!draft} />
-          </fieldset>
-          {!locked && (
-            <div>
-              <Button
-                type="submit"
-                name="intent"
-                value="save"
-                variant="outline"
-                disabled={navigation.state !== 'idle'}
-              >
-                Save changes
-              </Button>
-            </div>
+        <Card aria-label="Document">
+          <Facts>
+            <Fact label="Kind">{documentKindLabels[doc.kind]}</Fact>
+            <Fact label="Owner">{doc.ownerName}</Fact>
+            <Fact label="Source date" empty="Unknown">
+              {doc.datedOn}
+            </Fact>
+          </Facts>
+        </Card>
+        <Card aria-label="Content" className="flex flex-col gap-3">
+          <h2>Content</h2>
+          {doc.content ? (
+            <div className="break-words whitespace-pre-wrap">{doc.content}</div>
+          ) : (
+            <p className="text-muted-foreground">No content yet.</p>
           )}
-        </Form>
+        </Card>
         <FileCard doc={doc} editable={draft && !locked} />
       </DetailLayout>
     </>

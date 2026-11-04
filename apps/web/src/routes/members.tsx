@@ -3,14 +3,19 @@ import {
   Form,
   useActionData,
   useLoaderData,
-  useNavigation,
-  useSubmit,
   type ActionFunctionArgs,
 } from 'react-router';
-import { CopyLink } from '@/components/copy-link';
-import { Field, FieldGrid } from '@/components/field';
+import { Fact, Facts } from '@/components/facts';
+import { Field } from '@/components/field';
+import {
+  EditDialog,
+  FormDialog,
+  FormDialogBody,
+  FormDialogFooter,
+} from '@/components/form-dialog';
 import { FormError } from '@/components/form-error';
-import { PageHeader } from '@/components/page-header';
+import { InvitationDialog } from '@/components/invitation-dialog';
+import { PageHeader, SectionHeader } from '@/components/page-header';
 import { DataCell, EmptyRow, MainCell } from '@/components/table-parts';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -24,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import { api, attempt, refused } from '@/lib/api';
 import { invitationLink } from '@/lib/auth';
 import {
@@ -35,6 +41,7 @@ import {
   type Member,
   type Role,
 } from '@/lib/members';
+import { useFormFetcher } from '@/lib/use-form-fetcher';
 
 export function membersLoader() {
   return api<Invitation[]>('/invitations');
@@ -78,61 +85,83 @@ function RoleOptions() {
   ));
 }
 
-/** Changes a Member's role as soon as another one is chosen. A refusal shows at the top. */
-function RoleSelect({ member }: { member: Member }) {
-  const submit = useSubmit();
-  const { formData } = useNavigation();
-  const pending =
-    formData?.get('intent') === 'change-role' && formData.get('id') === member.id
-      ? (formData.get('role') as Role)
-      : undefined;
+function ChangeRole({ member, onClose }: { member: Member; onClose: () => void }) {
+  const fetcher = useFormFetcher(onClose);
 
   return (
-    <NativeSelect
-      aria-label={`Role of ${member.name}`}
-      className="h-7 w-36"
-      value={pending ?? member.role}
-      disabled={pending !== undefined}
-      onChange={(event) =>
-        submit(
-          { intent: 'change-role', id: member.id, role: event.target.value },
-          { method: 'post', preventScrollReset: true },
-        )
-      }
-    >
-      <RoleOptions />
-    </NativeSelect>
+    <FormDialog title={`Change the role of ${member.name}`} onClose={onClose}>
+      <fetcher.Form method="post" preventScrollReset className="contents">
+        <FormDialogBody>
+          <FormError message={fetcher.data?.error} />
+          <input type="hidden" name="id" value={member.id} />
+          <Field label="Role" htmlFor={`role-${member.id}`}>
+            <NativeSelect id={`role-${member.id}`} name="role" defaultValue={member.role}>
+              <RoleOptions />
+            </NativeSelect>
+          </Field>
+        </FormDialogBody>
+        <FormDialogFooter>
+          <Button
+            type="submit"
+            name="intent"
+            value="change-role"
+            disabled={fetcher.state !== 'idle'}
+          >
+            Change role
+          </Button>
+        </FormDialogFooter>
+      </fetcher.Form>
+    </FormDialog>
   );
 }
 
-function RemoveMember({ member }: { member: Member }) {
-  const [removing, setRemoving] = useState(false);
+function RemoveMember({ member, onClose }: { member: Member; onClose: () => void }) {
+  const fetcher = useFormFetcher(onClose);
 
-  if (!removing) {
-    return (
-      <Button type="button" variant="ghost" size="xs" onClick={() => setRemoving(true)}>
-        Remove
-      </Button>
-    );
-  }
   return (
-    <Form method="post" preventScrollReset className="flex items-center justify-end gap-1">
-      <input type="hidden" name="id" value={member.id} />
-      <Input
-        name="reason"
-        aria-label={`Why is ${member.name} leaving?`}
-        placeholder="Why are they leaving?"
-        className="h-7 w-56"
-        required
-        autoFocus
-      />
-      <Button type="submit" name="intent" value="remove" variant="destructive" size="xs">
-        Remove
+    <FormDialog title={`Remove ${member.name}`} onClose={onClose}>
+      <fetcher.Form method="post" preventScrollReset className="contents">
+        <FormDialogBody>
+          <FormError message={fetcher.data?.error} />
+          <input type="hidden" name="id" value={member.id} />
+          <Field label="Why are they leaving?" htmlFor={`reason-${member.id}`}>
+            <Textarea id={`reason-${member.id}`} name="reason" required autoFocus />
+          </Field>
+        </FormDialogBody>
+        <FormDialogFooter cancelLabel="Keep">
+          <Button
+            type="submit"
+            name="intent"
+            value="remove"
+            variant="destructive"
+            disabled={fetcher.state !== 'idle'}
+          >
+            Remove
+          </Button>
+        </FormDialogFooter>
+      </fetcher.Form>
+    </FormDialog>
+  );
+}
+
+function MemberActions({ member }: { member: Member }) {
+  const { me } = useAppData();
+  const [open, setOpen] = useState<'role' | 'remove' | null>(null);
+  const close = () => setOpen(null);
+
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <Button type="button" variant="ghost" size="xs" onClick={() => setOpen('role')}>
+        Change role
       </Button>
-      <Button type="button" variant="ghost" size="xs" onClick={() => setRemoving(false)}>
-        Keep
-      </Button>
-    </Form>
+      {member.id !== me.id && (
+        <Button type="button" variant="ghost" size="xs" onClick={() => setOpen('remove')}>
+          Remove
+        </Button>
+      )}
+      {open === 'role' && <ChangeRole member={member} onClose={close} />}
+      {open === 'remove' && <RemoveMember member={member} onClose={close} />}
+    </div>
   );
 }
 
@@ -141,36 +170,39 @@ export function Members() {
   const { canAdminister } = usePermissions();
   const invitations = useLoaderData<typeof membersLoader>();
   const result = useActionData<typeof membersAction>();
-  const navigation = useNavigation();
-  const saving = navigation.state !== 'idle';
+  const [inviting, setInviting] = useState(false);
 
   return (
     <>
       <PageHeader
         title="Members and settings"
         description="Every Member sees the whole ISMS. Their role decides what they can change. Only a risk's owner confirms that risk."
+        actions={
+          canAdminister && (
+            <Button type="button" onClick={() => setInviting(true)}>
+              Invite Member
+            </Button>
+          )
+        }
       />
       <FormError message={result && 'error' in result ? result.error : undefined} />
-      {result && 'link' in result && <CopyLink link={result.link} />}
-
-      {canAdminister && (
-        <Card aria-label="Invite a Member" className="flex flex-col gap-4">
-          <h2>Invite a Member</h2>
-          <Form method="post" className="flex flex-wrap items-end gap-2">
-            <Field label="Email" htmlFor="email" className="flex-[1_1_17.5rem]">
-              <Input id="email" name="email" type="email" required />
-            </Field>
-            <Field label="Role" htmlFor="role" className="flex-[0_1_11rem]">
-              <NativeSelect id="role" name="role" defaultValue="editor">
-                <RoleOptions />
-              </NativeSelect>
-            </Field>
-            <Button type="submit" name="intent" value="invite" disabled={saving}>
-              Create invitation link
-            </Button>
-          </Form>
+      {inviting && (
+        <InvitationDialog
+          title="Invite a Member"
+          intent="invite"
+          submitLabel="Create invitation link"
+          onClose={() => setInviting(false)}
+        >
+          <Field label="Email" htmlFor="email">
+            <Input id="email" name="email" type="email" required autoFocus />
+          </Field>
+          <Field label="Role" htmlFor="role">
+            <NativeSelect id="role" name="role" defaultValue="editor">
+              <RoleOptions />
+            </NativeSelect>
+          </Field>
           <p className="text-xs text-muted-foreground">Copy the link and send it yourself.</p>
-        </Card>
+        </InvitationDialog>
       )}
 
       <section className="flex flex-col gap-3">
@@ -191,18 +223,12 @@ export function Members() {
               <TableRow key={member.id}>
                 <MainCell className="font-medium">{member.name}</MainCell>
                 <DataCell>{member.email}</DataCell>
-                {canAdminister ? (
-                  <TableCell className="py-0">
-                    <RoleSelect member={member} />
-                  </TableCell>
-                ) : (
-                  <TableCell>{roleLabels[member.role]}</TableCell>
-                )}
+                <TableCell>{roleLabels[member.role]}</TableCell>
                 <DataCell>{member.risksOwned}</DataCell>
                 <DataCell>{member.joinedAt.slice(0, 10)}</DataCell>
                 {canAdminister && (
                   <TableCell className="py-0 text-right">
-                    {member.id !== me.id && <RemoveMember member={member} />}
+                    <MemberActions member={member} />
                   </TableCell>
                 )}
               </TableRow>
@@ -262,29 +288,23 @@ export function Members() {
       </section>
 
       <Card aria-label="Organization settings" className="flex flex-col gap-4">
-        <h2>Organization settings</h2>
-        <Form method="post" className="flex flex-col gap-4">
-          <fieldset disabled={!canAdminister} className="contents">
-            <FieldGrid>
+        <SectionHeader title="Organization settings">
+          {canAdminister && (
+            <EditDialog title="Rename the Organization" label="Rename" size="md" intent="rename">
               <Field label="Organization name" htmlFor="organization-name">
                 <Input
-                  key={me.organizationName}
                   id="organization-name"
                   name="name"
                   defaultValue={me.organizationName}
                   required
                 />
               </Field>
-            </FieldGrid>
-          </fieldset>
-          {canAdminister && (
-            <div>
-              <Button type="submit" name="intent" value="rename" variant="outline" disabled={saving}>
-                Save settings
-              </Button>
-            </div>
+            </EditDialog>
           )}
-        </Form>
+        </SectionHeader>
+        <Facts>
+          <Fact label="Organization name">{me.organizationName}</Fact>
+        </Facts>
       </Card>
 
     </>

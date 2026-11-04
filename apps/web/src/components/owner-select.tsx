@@ -35,6 +35,11 @@ export function OwnerSelect({ defaultValue, unassigned, ...props }: OwnerSelectP
   );
 }
 
+/** "Yes" or "No" for a fact on a record's page, or null while nobody knows. */
+export function yesNoLabel(value: boolean | null) {
+  return value === null ? null : value ? 'Yes' : 'No';
+}
+
 /** "Yes", "No" or "Unknown", as a select posts them. */
 export function yesNoValue(value: boolean | null) {
   return value === null ? '' : value ? 'yes' : 'no';

@@ -19,3 +19,5 @@ Every customer-owned table carries `organization_id` and every query on it must 
 ## UI
 
 Follow [docs/design-system.md](docs/design-system.md), including its steps for adding shadcn components; never run `shadcn init` again. Base components are in `apps/web/src/components/ui/`. Components use the semantic tokens from `apps/web/src/index.css` (`bg-surface`, `text-muted-foreground`, `bg-risk-high`); Tailwind's default palette is off. Logo artwork is in `docs/brand/`; never redraw it.
+
+Pages show, dialogs change: a record's page is read-only, and every form opens in a dialog from a button (Edit, Add file, End Supplier). Never put open inputs on a page. See "Pages show, dialogs change" in the design system.

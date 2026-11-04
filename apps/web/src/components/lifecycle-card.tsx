@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Form, useNavigation } from 'react-router';
 import { Field } from '@/components/field';
+import { FormDialog, FormDialogBody, FormDialogFooter } from '@/components/form-dialog';
+import { FormError } from '@/components/form-error';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { usePermissions } from '@/lib/members';
+import { useFormFetcher } from '@/lib/use-form-fetcher';
 
 export interface LifecycleAction {
   /** Posted to the page's action, with the reason. */
@@ -22,29 +24,32 @@ interface LifecycleCardProps {
   actions: LifecycleAction[];
 }
 
-function ReasonForm({ action, onCancel }: { action: LifecycleAction; onCancel: () => void }) {
-  const navigation = useNavigation();
+/** Deleting redirects to the register, which a fetcher follows. */
+function ReasonDialog({ action, onClose }: { action: LifecycleAction; onClose: () => void }) {
+  const fetcher = useFormFetcher(onClose);
 
   return (
-    <Form method="post" className="flex flex-col gap-3">
-      <Field label={action.prompt} htmlFor="reason">
-        <Textarea id="reason" name="reason" required autoFocus />
-      </Field>
-      <div className="flex items-center gap-2">
-        <Button
-          type="submit"
-          name="intent"
-          value={action.intent}
-          variant={action.destructive ? 'destructive' : 'default'}
-          disabled={navigation.state !== 'idle'}
-        >
-          {action.label}
-        </Button>
-        <Button type="button" variant="ghost" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
-    </Form>
+    <FormDialog title={action.label} onClose={onClose}>
+      <fetcher.Form method="post" className="contents">
+        <FormDialogBody>
+          <FormError message={fetcher.data?.error} />
+          <Field label={action.prompt} htmlFor="reason">
+            <Textarea id="reason" name="reason" required autoFocus />
+          </Field>
+        </FormDialogBody>
+        <FormDialogFooter>
+          <Button
+            type="submit"
+            name="intent"
+            value={action.intent}
+            variant={action.destructive ? 'destructive' : 'default'}
+            disabled={fetcher.state !== 'idle'}
+          >
+            {action.label}
+          </Button>
+        </FormDialogFooter>
+      </fetcher.Form>
+    </FormDialog>
   );
 }
 
@@ -61,27 +66,22 @@ export function LifecycleCard({ title, text, actions: offered }: LifecycleCardPr
   return (
     <Card aria-label={title} className="flex flex-col gap-3">
       <h2>{title}</h2>
-      {chosen ? (
-        <ReasonForm action={chosen} onCancel={() => setChosen(null)} />
-      ) : (
-        <>
-          <p className="text-muted-foreground">{text}</p>
-          {actions.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {actions.map((action) => (
-                <Button
-                  key={action.intent}
-                  type="button"
-                  variant={action.destructive ? 'ghost' : 'outline'}
-                  onClick={() => setChosen(action)}
-                >
-                  {action.label}
-                </Button>
-              ))}
-            </div>
-          )}
-        </>
+      <p className="text-muted-foreground">{text}</p>
+      {actions.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {actions.map((action) => (
+            <Button
+              key={action.intent}
+              type="button"
+              variant={action.destructive ? 'ghost' : 'outline'}
+              onClick={() => setChosen(action)}
+            >
+              {action.label}
+            </Button>
+          ))}
+        </div>
       )}
+      {chosen && <ReasonDialog action={chosen} onClose={() => setChosen(null)} />}
     </Card>
   );
 }

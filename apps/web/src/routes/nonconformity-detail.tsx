@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import {
-  Form,
   redirect,
   useActionData,
   useLoaderData,
-  useNavigation,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
 } from 'react-router';
 import { DetailLayout } from '@/components/detail-layout';
+import { Fact, Facts } from '@/components/facts';
+import { EditDialog } from '@/components/form-dialog';
 import { FormError } from '@/components/form-error';
 import { HistoryList } from '@/components/history-list';
 import { LifecycleCard, type LifecycleAction } from '@/components/lifecycle-card';
@@ -99,7 +99,6 @@ function lifecycleProps(nonconformity: Details) {
 export function NonconformityDetail() {
   const { nonconformity, tasks } = useLoaderData<typeof nonconformityDetailLoader>();
   const result = useActionData<typeof nonconformityDetailAction>();
-  const navigation = useNavigation();
   const [addingTask, setAddingTask] = useState(false);
   const closed = nonconformity.closedAt !== null;
   const { canEdit } = usePermissions();
@@ -111,7 +110,16 @@ export function NonconformityDetail() {
         title={nonconformity.title}
         eyebrow={<Ref>{nonconformity.ref}</Ref>}
         back={{ to: '/nonconformities', label: 'Nonconformities' }}
-        actions={<StateBadge kind="nonconformity" state={nonconformity.state} />}
+        actions={
+          <>
+            <StateBadge kind="nonconformity" state={nonconformity.state} />
+            {!locked && (
+              <EditDialog title="Edit Nonconformity">
+                <NonconformityFields nonconformity={nonconformity} />
+              </EditDialog>
+            )}
+          </>
+        }
       />
       <FormError message={result?.error} />
       {closed && (
@@ -134,24 +142,19 @@ export function NonconformityDetail() {
           </>
         }
       >
-        <Form method="post" className="flex flex-col gap-6">
-          <fieldset disabled={locked} className="contents">
-            <NonconformityFields key={nonconformity.ref} nonconformity={nonconformity} />
-          </fieldset>
-          {!locked && (
-            <div>
-              <Button
-                type="submit"
-                name="intent"
-                value="save"
-                variant="outline"
-                disabled={navigation.state !== 'idle'}
-              >
-                Save changes
-              </Button>
-            </div>
-          )}
-        </Form>
+        <Card aria-label="Nonconformity">
+          <Facts>
+            <Fact label="Details" empty="None" wide>
+              {nonconformity.description}
+            </Fact>
+            <Fact label="Where it was found">{nonconformity.foundIn}</Fact>
+            <Fact label="Found on">{nonconformity.foundOn}</Fact>
+            <Fact label="Owner">{nonconformity.ownerName}</Fact>
+            <Fact label="What caused it, needed before you can close it" empty="Not known yet" wide>
+              {nonconformity.cause}
+            </Fact>
+          </Facts>
+        </Card>
 
         <section className="flex flex-col gap-3">
           <SectionHeader title="Tasks">

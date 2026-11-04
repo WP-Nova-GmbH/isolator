@@ -1,20 +1,19 @@
+import { useState } from 'react';
 import { UserButton } from '@clerk/react';
 import {
   Form,
   redirect,
   useActionData,
   useLoaderData,
-  useNavigation,
   type ActionFunctionArgs,
 } from 'react-router';
-import { CopyLink } from '@/components/copy-link';
-import { Field, FieldGrid } from '@/components/field';
+import { Field } from '@/components/field';
 import { FormError } from '@/components/form-error';
+import { InvitationDialog } from '@/components/invitation-dialog';
 import { Logo } from '@/components/logo';
 import { PageHeader } from '@/components/page-header';
 import { DataCell, EmptyRow, MainCell } from '@/components/table-parts';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import {
@@ -72,72 +71,59 @@ export async function organizationsAction({ request }: ActionFunctionArgs) {
   });
 }
 
-function OperatorCards({ organizations }: { organizations: Organization[] }) {
-  const navigation = useNavigation();
+function OperatorActions({ organizations }: { organizations: Organization[] }) {
+  const [open, setOpen] = useState<'create' | 'invite' | null>(null);
+  const close = () => setOpen(null);
 
   return (
     <>
-      <Card aria-label="Create Organization" className="flex flex-col gap-4">
-        <h2>Create Organization</h2>
-        <Form method="post" className="flex flex-col gap-4">
-          <FieldGrid>
-            <Field label="Organization name" htmlFor="organization-name">
-              <Input id="organization-name" name="name" required />
-            </Field>
-            <Field label="Email of its first Member" htmlFor="first-member">
-              <Input id="first-member" name="email" type="email" required />
-            </Field>
-          </FieldGrid>
-          <div>
-            <Button
-              type="submit"
-              name="intent"
-              value="create"
-              disabled={navigation.state !== 'idle'}
-            >
-              Create and get invitation link
-            </Button>
-          </div>
-        </Form>
-      </Card>
-
       {organizations.length > 0 && (
-        <Card aria-label="Invite to an Organization" className="flex flex-col gap-4">
-          <div>
-            <h2>Invite to an Organization</h2>
-            <p className="text-muted-foreground">
-              For a link that was lost or ran out. To work in an Organization yourself, invite your
-              own email.
-            </p>
-          </div>
-          <Form method="post" className="flex flex-col gap-4">
-            <FieldGrid>
-              <Field label="Organization" htmlFor="invite-organization">
-                <NativeSelect id="invite-organization" name="organizationId">
-                  {organizations.map((organization) => (
-                    <option key={organization.id} value={organization.id}>
-                      {organization.name}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </Field>
-              <Field label="Email" htmlFor="invite-email">
-                <Input id="invite-email" name="email" type="email" required />
-              </Field>
-            </FieldGrid>
-            <div>
-              <Button
-                type="submit"
-                name="intent"
-                value="invite"
-                variant="outline"
-                disabled={navigation.state !== 'idle'}
-              >
-                Get invitation link
-              </Button>
-            </div>
-          </Form>
-        </Card>
+        <Button type="button" variant="outline" onClick={() => setOpen('invite')}>
+          Invite to an Organization
+        </Button>
+      )}
+      <Button type="button" onClick={() => setOpen('create')}>
+        Create Organization
+      </Button>
+      {open === 'create' && (
+        <InvitationDialog
+          title="Create Organization"
+          intent="create"
+          submitLabel="Create and get invitation link"
+          onClose={close}
+        >
+          <Field label="Organization name" htmlFor="organization-name">
+            <Input id="organization-name" name="name" required autoFocus />
+          </Field>
+          <Field label="Email of its first Member" htmlFor="first-member">
+            <Input id="first-member" name="email" type="email" required />
+          </Field>
+        </InvitationDialog>
+      )}
+      {open === 'invite' && (
+        <InvitationDialog
+          title="Invite to an Organization"
+          intent="invite"
+          submitLabel="Get invitation link"
+          onClose={close}
+        >
+          <p className="text-muted-foreground">
+            For a link that was lost or ran out. To work in an Organization yourself, invite your
+            own email.
+          </p>
+          <Field label="Organization" htmlFor="invite-organization">
+            <NativeSelect id="invite-organization" name="organizationId">
+              {organizations.map((organization) => (
+                <option key={organization.id} value={organization.id}>
+                  {organization.name}
+                </option>
+              ))}
+            </NativeSelect>
+          </Field>
+          <Field label="Email" htmlFor="invite-email">
+            <Input id="invite-email" name="email" type="email" required />
+          </Field>
+        </InvitationDialog>
       )}
     </>
   );
@@ -163,9 +149,9 @@ export function Organizations() {
         <PageHeader
           title="Organizations"
           description="Each Organization is one ISMS working towards one certificate."
+          actions={me.isOperator && <OperatorActions organizations={organizations} />}
         />
         <FormError message={result && 'error' in result ? result.error : undefined} />
-        {result && 'link' in result && <CopyLink link={result.link} />}
 
         <Table>
           <TableHeader>
@@ -199,14 +185,12 @@ export function Organizations() {
             {organizations.length === 0 && (
               <EmptyRow colSpan={4}>
                 {me.isOperator
-                  ? 'No Organizations yet. Create the first one below.'
+                  ? 'No Organizations yet. Create the first one.'
                   : 'You aren’t in an Organization yet. Ask for an invitation link.'}
               </EmptyRow>
             )}
           </TableBody>
         </Table>
-
-        {me.isOperator && <OperatorCards organizations={organizations} />}
       </main>
     </div>
   );
