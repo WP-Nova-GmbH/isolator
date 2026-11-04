@@ -1,5 +1,7 @@
-// ISO/IEC 27001:2022 Annex A control references and titles.
-// Titles only: the control text itself is copyrighted by ISO and must not be reproduced here.
+// ISO/IEC 27001:2022 Annex A control references and titles, © ISO/IEC 2022. They belong to ISO and
+// IEC and are not covered by Isolator's MIT licence, see NOTICE. The standard is sold at
+// https://www.iso.org/standard/27001.
+// Titles only: the control text itself must not be reproduced here.
 
 export type ControlTheme = 'organizational' | 'people' | 'physical' | 'technological';
 
