@@ -42,7 +42,8 @@ Every register is a `DataTable`: click a column heading to sort by it, type in t
 - A page searches its main list only, and only when the list can grow long: the Risk assessments, one a year, have no search box. A page's other lists, such as Retired assets below the register or the Tasks on a record's page, sort and page but have no search box. Their URL params carry a prefix (`?retired-sort=retired`, `?tasks-sort=due`), so two lists on one page don't share a sort.
 - Pages appear only when a list holds more than 25 records.
 - The Audit trail is too long to load whole, so the server pages and searches it (`rowCount` on `DataTable`). It stays newest first, and its search covers who, the record and the reason.
-- Tables that aren't lists keep `Table` on its own: the Readiness checklist, what goes in the Audit file, the risk criteria levels, and the preview in an import. Their order means something, and a Needs attention list is short enough to read at a glance.
+- What needs work is a filter of the register, never a second list of the same records. Stat tiles above it give the counts, and the filter's tabs carry a count each: Risks has Needs treatment and Needs Confirmation (`/risks?tab=confirmation`), Suppliers has Needs attention, which adds a column saying what each one is missing. A record's own page still shows what it needs in its side column.
+- Tables that aren't lists keep `Table` on its own: the Readiness checklist, what goes in the Audit file, the risk criteria levels, and the preview in an import. Their order means something.
 
 ## Logo
 
@@ -166,7 +167,7 @@ Base components live in `components/ui/`. They started as stock shadcn and are o
 | `RiskMatrix` | `risk-matrix.tsx` | The fixed 5 × 5 matrix |
 | `StateBadge` | `state-badge.tsx` | `Badge` for a domain state. The only place states map to tones |
 | `PageHeader`, `SectionHeader` | `page-header.tsx` | Title, description and actions |
-| `TabNav`, `RiskTabs`, `useTabFilter` | `tab-nav.tsx` | The only tabs: segmented links, each to its own URL. A part of a page is a route, a filter of one list a search param. Give an item a `count` to show how many records it holds |
+| `TabNav`, `RiskTabs`, `useTabFilter` | `tab-nav.tsx` | The only tabs: segmented links, each to its own URL. A part of a page is a route, a filter of one list a search param. Give an item, or a tab passed to `useTabFilter`, a `count` to show how many records it holds |
 | `StatGrid`, `StatTile` | `stat-tile.tsx` | Summary numbers on a sunken tile |
 | `HistoryList` | `history-list.tsx` | Timeline of Confirmations or Document versions |
 | `ConfirmationCard` | `confirmation-card.tsx` | The same card on every record that needs a Confirmation. Confirms the record as saved, which is what the page shows |

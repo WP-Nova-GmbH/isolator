@@ -1,12 +1,13 @@
+import { useMemo } from 'react';
 import { Link, useLoaderData, type ActionFunctionArgs } from 'react-router';
 import { ImportButton } from '@/components/import-dialog';
 import { PageHeader } from '@/components/page-header';
+import { StatGrid, StatTile } from '@/components/stat-tile';
 import { StateBadge } from '@/components/state-badge';
+import { TabNav, useTabFilter } from '@/components/tab-nav';
 import { columnHelper, DataTable, sortByOrder } from '@/components/data-table';
 import {
-  DataCell,
   dataCell,
-  EmptyRow,
   mainCell,
   NoValue,
   noteCell,
@@ -14,7 +15,6 @@ import {
   Ref,
 } from '@/components/table-parts';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { api } from '@/lib/api';
 import { importAction } from '@/lib/imports';
 import { useAppData, usePermissions } from '@/lib/members';
@@ -35,31 +35,51 @@ export async function suppliersAction({ request }: ActionFunctionArgs) {
 
 const column = columnHelper<Supplier>();
 
-const columns = column.columns([
-  column.accessor('ref', { header: 'ID', cell: ({ getValue }) => <Ref>{getValue()}</Ref> }),
-  column.accessor('name', {
-    header: 'Supplier',
-    meta: { className: mainCell },
-    cell: ({ row: { original: supplier } }) => (
-      <>
-        <RecordLink to={`/suppliers/${supplier.ref}`}>{supplier.name}</RecordLink>
-        {supplier.provides && (
-          <div className="line-clamp-1 text-xs text-muted-foreground" title={supplier.provides}>
-            {supplier.provides}
-          </div>
-        )}
-      </>
-    ),
-  }),
-  column.accessor(
-    (supplier) => (supplier.criticality ? criticalityLabels[supplier.criticality] : undefined),
-    {
-      id: 'criticality',
-      header: 'Criticality',
-      sortFn: sortByOrder(Object.keys(criticalityLabels), (supplier) => supplier.criticality),
-      cell: ({ getValue }) => getValue() ?? <NoValue>{UNKNOWN}</NoValue>,
-    },
+const refColumn = column.accessor('ref', {
+  header: 'ID',
+  cell: ({ getValue }) => <Ref>{getValue()}</Ref>,
+});
+
+const nameColumn = column.accessor('name', {
+  header: 'Supplier',
+  meta: { className: mainCell },
+  cell: ({ row: { original: supplier } }) => (
+    <>
+      <RecordLink to={`/suppliers/${supplier.ref}`}>{supplier.name}</RecordLink>
+      {supplier.provides && (
+        <div className="line-clamp-1 text-xs text-muted-foreground" title={supplier.provides}>
+          {supplier.provides}
+        </div>
+      )}
+    </>
   ),
+});
+
+const criticalityColumn = column.accessor(
+  (supplier) => (supplier.criticality ? criticalityLabels[supplier.criticality] : undefined),
+  {
+    id: 'criticality',
+    header: 'Criticality',
+    sortFn: sortByOrder(Object.keys(criticalityLabels), (supplier) => supplier.criticality),
+    cell: ({ getValue }) => getValue() ?? <NoValue>{UNKNOWN}</NoValue>,
+  },
+);
+
+const nextReviewColumn = column.accessor('nextReviewOn', {
+  header: 'Next review',
+  meta: { className: dataCell },
+});
+
+const ownerColumn = column.accessor((supplier) => supplier.ownerName ?? undefined, {
+  id: 'owner',
+  header: 'Owner',
+  cell: ({ getValue }) => getValue() ?? <NoValue>{UNASSIGNED}</NoValue>,
+});
+
+const columns = column.columns([
+  refColumn,
+  nameColumn,
+  criticalityColumn,
   column.accessor('assetCount', {
     header: 'Assets',
     enableGlobalFilter: false,
@@ -80,17 +100,46 @@ const columns = column.columns([
       cell: ({ row }) => contractEndLabel(row.original),
     },
   ),
-  column.accessor('nextReviewOn', { header: 'Next review', meta: { className: dataCell } }),
-  column.accessor((supplier) => supplier.ownerName ?? undefined, {
-    id: 'owner',
-    header: 'Owner',
-    cell: ({ getValue }) => getValue() ?? <NoValue>{UNASSIGNED}</NoValue>,
-  }),
+  nextReviewColumn,
+  ownerColumn,
   column.accessor('state', {
     header: 'State',
     cell: ({ getValue }) => <StateBadge kind="supplier" state={getValue()} />,
   }),
 ]);
+
+/** The Needs attention filter shows what each Supplier is missing in place of the contract. */
+const attentionColumns = column.columns([
+  refColumn,
+  nameColumn,
+  column.accessor((supplier) => supplier.attention.join(' · '), {
+    id: 'attention',
+    header: 'Needs attention',
+    enableSorting: false,
+    meta: { className: 'min-w-60 whitespace-normal text-muted-foreground' },
+    cell: ({ row }) => (
+      // The dot trails each item, so a wrapped line starts with an item, not a dot.
+      <ul className="flex flex-wrap gap-x-2 gap-y-0.5 [&>li:not(:last-child)]:after:ml-2 [&>li:not(:last-child)]:after:content-['·']">
+        {row.original.attention.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    ),
+  }),
+  criticalityColumn,
+  nextReviewColumn,
+  ownerColumn,
+]);
+
+/** What nobody has found out yet about a Supplier. */
+function hasUnknowns(supplier: Supplier) {
+  return (
+    !supplier.ownerId ||
+    !supplier.criticality ||
+    supplier.handlesPersonalData === null ||
+    !supplier.contractTerm
+  );
+}
 
 const endedColumns = column.columns([
   column.accessor('ref', { header: 'ID', cell: ({ getValue }) => <Ref>{getValue()}</Ref> }),
@@ -113,7 +162,15 @@ export function Suppliers() {
   const { canEdit } = usePermissions();
   const { suppliers, ended } = useLoaderData<typeof suppliersLoader>();
   const { me } = useAppData();
-  const needsAttention = suppliers.filter((supplier) => supplier.attention.length > 0);
+  const needsAttention = useMemo(
+    () => suppliers.filter((supplier) => supplier.attention.length > 0),
+    [suppliers],
+  );
+  const { value, items } = useTabFilter([
+    { value: 'all', label: 'All', count: suppliers.length },
+    { value: 'attention', label: 'Needs attention', count: needsAttention.length },
+  ]);
+  const attention = value === 'attention';
 
   return (
     <>
@@ -132,40 +189,29 @@ export function Suppliers() {
         }
       />
 
-      <section aria-label="Needs attention" className="flex flex-col gap-3">
-        <h2>Needs attention</h2>
-        <Table>
-          <TableBody>
-            {needsAttention.map((supplier) => (
-              <TableRow key={supplier.ref}>
-                <TableCell className="w-0">
-                  <RecordLink to={`/suppliers/${supplier.ref}`}>{supplier.name}</RecordLink>
-                </TableCell>
-                <DataCell className="min-w-60 whitespace-normal">
-                  {/* The dot trails each item, so a wrapped line starts with an item, not a dot. */}
-                  <ul className="flex flex-wrap gap-x-2 gap-y-0.5 [&>li:not(:last-child)]:after:ml-2 [&>li:not(:last-child)]:after:content-['·']">
-                    {supplier.attention.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </DataCell>
-              </TableRow>
-            ))}
-            {needsAttention.length === 0 && (
-              <EmptyRow colSpan={2}>Every Supplier is in order.</EmptyRow>
-            )}
-          </TableBody>
-        </Table>
-      </section>
+      <StatGrid label="Supplier summary">
+        <StatTile
+          value={needsAttention.length}
+          label={`of ${suppliers.length} Suppliers need attention`}
+        />
+        <StatTile
+          value={suppliers.filter((supplier) => supplier.state === 'Review overdue').length}
+          label="with a review overdue"
+        />
+        <StatTile value={suppliers.filter(hasUnknowns).length} label="with facts still unknown" />
+      </StatGrid>
 
       <section aria-label="Supplier register" className="flex flex-col gap-3">
         <h2>Register</h2>
         <DataTable
-          columns={columns}
-          data={suppliers}
+          columns={attention ? attentionColumns : columns}
+          data={attention ? needsAttention : suppliers}
           getRowId={(supplier) => supplier.ref}
+          filters={<TabNav label="Supplier register filter" items={items} />}
           searchLabel="Search Suppliers"
-          emptyText="No Suppliers yet. Add the first one."
+          emptyText={
+            attention ? 'Every Supplier is in order.' : 'No Suppliers yet. Add the first one.'
+          }
         />
       </section>
 

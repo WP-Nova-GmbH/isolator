@@ -53,14 +53,18 @@ export function tabSearch(params: URLSearchParams, tab: string | null) {
   return next;
 }
 
-/** Reads a list filter from the URL, so a filtered list can be linked to. */
-export function useTabFilter(tabs: { value: string; label: string }[]) {
+/**
+ * Reads a list filter from the URL, so a filtered list can be linked to. Give a tab a count
+ * when the page knows how many records it holds.
+ */
+export function useTabFilter(tabs: { value: string; label: string; count?: number }[]) {
   const [params] = useSearchParams();
   const value = params.get('tab') ?? tabs[0].value;
   const items = tabs.map((tab) => ({
     to: `?${tabSearch(params, tab.value)}`,
     label: tab.label,
     active: tab.value === value,
+    count: tab.count,
   }));
   return { value, items };
 }

@@ -1,16 +1,15 @@
+import { useMemo } from 'react';
 import { Link, useLoaderData } from 'react-router';
 import { DetailLayout } from '@/components/detail-layout';
 import { PageHeader } from '@/components/page-header';
 import { RiskMatrix } from '@/components/risk-matrix';
 import { RiskScore } from '@/components/risk-score';
+import { StatGrid, StatTile } from '@/components/stat-tile';
 import { StateBadge } from '@/components/state-badge';
-import { RiskTabs } from '@/components/tab-nav';
+import { RiskTabs, TabNav, useTabFilter } from '@/components/tab-nav';
 import { columnHelper, DataTable } from '@/components/data-table';
 import {
-  DataCell,
   dataCell,
-  EmptyRow,
-  MainCell,
   mainCell,
   NoValue,
   noteCell,
@@ -19,7 +18,6 @@ import {
 } from '@/components/table-parts';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Table, TableBody, TableRow } from '@/components/ui/table';
 import { api } from '@/lib/api';
 import { usePermissions } from '@/lib/members';
 import {
@@ -39,12 +37,16 @@ export async function risksLoader() {
   return { risks, closed, criteria };
 }
 
-function attentionNote(risk: Risk, threshold: number) {
-  if (!risk.treatment && risk.likelihood * risk.impact > threshold) {
-    return 'Above the threshold, no treatment yet';
-  }
-  return `Needs Confirmation from ${risk.ownerName}`;
+/** Above the threshold and no treatment chosen, so its owner can't confirm it yet. */
+function needsTreatment(risk: Risk, threshold: number) {
+  return !risk.treatment && risk.likelihood * risk.impact > threshold;
 }
+
+const emptyTexts: Record<string, string> = {
+  all: 'No risks yet. Add the first one.',
+  treatment: 'Every risk above the threshold has a treatment.',
+  confirmation: 'No risk is waiting for a Confirmation.',
+};
 
 const column = columnHelper<Risk>();
 
@@ -113,13 +115,27 @@ const closedColumns = column.columns([
 export function Risks() {
   const { canEdit } = usePermissions();
   const { risks, closed, criteria } = useLoaderData<typeof risksLoader>();
-  const needsAttention = risks.filter((risk) => !risk.confirmation);
+  const threshold = criteria.acceptanceThreshold;
+  // Each open risk that isn't confirmed waits for one of two things, never both.
+  const { toTreat, toConfirm } = useMemo(
+    () => ({
+      toTreat: risks.filter((risk) => needsTreatment(risk, threshold)),
+      toConfirm: risks.filter((risk) => !risk.confirmation && !needsTreatment(risk, threshold)),
+    }),
+    [risks, threshold],
+  );
+  const { value, items } = useTabFilter([
+    { value: 'all', label: 'All', count: risks.length },
+    { value: 'treatment', label: 'Needs treatment', count: toTreat.length },
+    { value: 'confirmation', label: 'Needs Confirmation', count: toConfirm.length },
+  ]);
+  const shown = value === 'treatment' ? toTreat : value === 'confirmation' ? toConfirm : risks;
 
   return (
     <>
       <PageHeader
         title="Risks"
-        description={`Risks above your acceptance threshold of ${criteria.acceptanceThreshold} need treatment.`}
+        description={`Risks above your acceptance threshold of ${threshold} need treatment.`}
         actions={
           canEdit && (
             <Button asChild>
@@ -142,36 +158,25 @@ export function Risks() {
           </Card>
         }
       >
-        <section aria-label="Needs attention" className="flex flex-col gap-3">
-          <h2>Needs attention</h2>
-          <Table>
-            <TableBody>
-              {needsAttention.map((risk) => (
-                <TableRow key={risk.ref}>
-                  <MainCell>
-                    <RecordLink to={`/risks/${risk.ref}`}>{risk.title}</RecordLink>
-                  </MainCell>
-                  <DataCell className="whitespace-normal">
-                    {attentionNote(risk, criteria.acceptanceThreshold)}
-                  </DataCell>
-                </TableRow>
-              ))}
-              {needsAttention.length === 0 && (
-                <EmptyRow colSpan={2}>Every risk has a Confirmation.</EmptyRow>
-              )}
-            </TableBody>
-          </Table>
-        </section>
+        <StatGrid label="Risk summary">
+          <StatTile
+            value={risks.filter((risk) => risk.confirmation).length}
+            label={`of ${risks.length} risks confirmed`}
+          />
+          <StatTile value={toTreat.length} label="above the threshold without treatment" />
+          <StatTile value={toConfirm.length} label="waiting for their owner's Confirmation" />
+        </StatGrid>
       </DetailLayout>
 
       <section aria-label="Risk register" className="flex flex-col gap-3">
         <h2>Register</h2>
         <DataTable
           columns={columns}
-          data={risks}
+          data={shown}
           getRowId={(risk) => risk.ref}
+          filters={<TabNav label="Risk register filter" items={items} />}
           searchLabel="Search risks"
-          emptyText="No risks yet. Add the first one."
+          emptyText={emptyTexts[value] ?? emptyTexts.all}
         />
       </section>
 
