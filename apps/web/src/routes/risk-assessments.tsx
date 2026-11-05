@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   Form,
   useActionData,
@@ -9,17 +10,10 @@ import { FormError } from '@/components/form-error';
 import { PageHeader } from '@/components/page-header';
 import { StateBadge } from '@/components/state-badge';
 import { RiskTabs } from '@/components/tab-nav';
-import { DataCell, EmptyRow, MainCell, RecordLink } from '@/components/table-parts';
+import { columnHelper, DataTable, sortByOrder } from '@/components/data-table';
+import { dataCell, mainCell, RecordLink } from '@/components/table-parts';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { api, attempt } from '@/lib/api';
 import { usePermissions } from '@/lib/members';
 import type { Risk, RiskAssessmentList } from '@/lib/risks';
@@ -41,6 +35,53 @@ export async function riskAssessmentsAction({ request }: ActionFunctionArgs) {
   );
 }
 
+/** A Risk assessment, or the yearly one that is due next. */
+interface AssessmentRow {
+  id: string;
+  date: string;
+  title: string;
+  /** Only a completed Risk assessment has a page of its own. */
+  to?: string;
+  risks?: number;
+  aboveThreshold?: number;
+  completedBy?: string;
+  state: 'Planned' | 'In progress' | 'Completed';
+}
+
+const column = columnHelper<AssessmentRow>();
+
+const columns = column.columns([
+  column.accessor('date', { header: 'Date', meta: { className: dataCell } }),
+  column.accessor('title', {
+    header: 'Risk assessment',
+    meta: { className: mainCell },
+    cell: ({ row: { original: row } }) =>
+      row.to ? <RecordLink to={row.to}>{row.title}</RecordLink> : row.title,
+  }),
+  column.accessor('risks', {
+    header: 'Risks',
+    enableGlobalFilter: false,
+    meta: { className: dataCell },
+    cell: ({ getValue }) => getValue() ?? 'None',
+  }),
+  column.accessor('aboveThreshold', {
+    header: 'Above threshold',
+    enableGlobalFilter: false,
+    meta: { className: dataCell },
+    cell: ({ getValue }) => getValue() ?? 'None',
+  }),
+  column.accessor('completedBy', {
+    header: 'Completed by',
+    meta: { className: dataCell },
+    cell: ({ getValue }) => getValue() ?? 'Not yet',
+  }),
+  column.accessor('state', {
+    header: 'State',
+    sortFn: sortByOrder(['Planned', 'In progress', 'Completed'], (row) => row.state),
+    cell: ({ getValue }) => <StateBadge kind="assessment" state={getValue()} />,
+  }),
+]);
+
 export function RiskAssessments() {
   const { canEdit } = usePermissions();
   const { assessments, nextDue, risks } = useLoaderData<typeof riskAssessmentsLoader>();
@@ -49,6 +90,25 @@ export function RiskAssessments() {
   const inProgress = assessments.find((assessment) => !assessment.completed);
   const unconfirmed = risks.filter((risk) => !risk.confirmation).length;
   const busy = navigation.state !== 'idle';
+  const rows = useMemo<AssessmentRow[]>(
+    () => [
+      ...(nextDue
+        ? [{ id: 'planned', date: nextDue, title: 'Yearly review', state: 'Planned' as const }]
+        : []),
+      ...assessments.map((assessment) => ({
+        id: assessment.id,
+        date: assessment.date,
+        title: assessment.title,
+        // An assessment in progress is the register itself.
+        to: assessment.completed ? `/risks/assessments/${assessment.id}` : '/risks',
+        risks: assessment.risks,
+        aboveThreshold: assessment.aboveThreshold,
+        completedBy: assessment.completedBy ?? undefined,
+        state: assessment.completed ? ('Completed' as const) : ('In progress' as const),
+      })),
+    ],
+    [assessments, nextDue],
+  );
 
   return (
     <>
@@ -84,56 +144,12 @@ export function RiskAssessments() {
         </Alert>
       )}
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead>Risk assessment</TableHead>
-            <TableHead>Risks</TableHead>
-            <TableHead>Above threshold</TableHead>
-            <TableHead>Completed by</TableHead>
-            <TableHead>State</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {nextDue && (
-            <TableRow>
-              <DataCell>{nextDue}</DataCell>
-              <MainCell>Yearly review</MainCell>
-              <DataCell>None</DataCell>
-              <DataCell>None</DataCell>
-              <DataCell>Not yet</DataCell>
-              <TableCell>
-                <StateBadge kind="assessment" state="Planned" />
-              </TableCell>
-            </TableRow>
-          )}
-          {assessments.map((assessment) => (
-            <TableRow key={assessment.id}>
-              <DataCell>{assessment.date}</DataCell>
-              <MainCell>
-                <RecordLink
-                  to={assessment.completed ? `/risks/assessments/${assessment.id}` : '/risks'}
-                >
-                  {assessment.title}
-                </RecordLink>
-              </MainCell>
-              <DataCell>{assessment.risks}</DataCell>
-              <DataCell>{assessment.aboveThreshold}</DataCell>
-              <DataCell>{assessment.completedBy ?? 'Not yet'}</DataCell>
-              <TableCell>
-                <StateBadge
-                  kind="assessment"
-                  state={assessment.completed ? 'Completed' : 'In progress'}
-                />
-              </TableCell>
-            </TableRow>
-          ))}
-          {assessments.length === 0 && (
-            <EmptyRow colSpan={6}>No Risk assessments yet. Start the first one.</EmptyRow>
-          )}
-        </TableBody>
-      </Table>
+      <DataTable
+        columns={columns}
+        data={rows}
+        getRowId={(row) => row.id}
+        emptyText="No Risk assessments yet. Start the first one."
+      />
     </>
   );
 }

@@ -5,17 +5,21 @@ import { RiskMatrix } from '@/components/risk-matrix';
 import { RiskScore } from '@/components/risk-score';
 import { StateBadge } from '@/components/state-badge';
 import { RiskTabs } from '@/components/tab-nav';
-import { DataCell, EmptyRow, MainCell, RecordLink, Ref } from '@/components/table-parts';
+import { columnHelper, DataTable } from '@/components/data-table';
+import {
+  DataCell,
+  dataCell,
+  EmptyRow,
+  MainCell,
+  mainCell,
+  NoValue,
+  noteCell,
+  RecordLink,
+  Ref,
+} from '@/components/table-parts';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableRow } from '@/components/ui/table';
 import { api } from '@/lib/api';
 import { usePermissions } from '@/lib/members';
 import {
@@ -42,15 +46,69 @@ function attentionNote(risk: Risk, threshold: number) {
   return `Needs Confirmation from ${risk.ownerName}`;
 }
 
-function ResidualCell({ risk }: { risk: Risk }) {
-  const residual = residualScore(risk);
-  if (!residual) return <DataCell>Not set</DataCell>;
-  return (
-    <TableCell>
-      <RiskScore {...residual} />
-    </TableCell>
-  );
+const column = columnHelper<Risk>();
+
+function score(rating: { likelihood: number; impact: number } | null) {
+  return rating ? rating.likelihood * rating.impact : undefined;
 }
+
+const columns = column.columns([
+  column.accessor('ref', { header: 'ID', cell: ({ getValue }) => <Ref>{getValue()}</Ref> }),
+  column.accessor('title', {
+    header: 'Risk',
+    meta: { className: mainCell },
+    cell: ({ row: { original: risk } }) => (
+      <RecordLink to={`/risks/${risk.ref}`}>{risk.title}</RecordLink>
+    ),
+  }),
+  column.accessor((risk) => score(risk), {
+    id: 'before',
+    header: 'Before',
+    enableGlobalFilter: false,
+    cell: ({ row: { original: risk } }) => (
+      <RiskScore likelihood={risk.likelihood} impact={risk.impact} />
+    ),
+  }),
+  column.accessor((risk) => score(residualScore(risk)), {
+    id: 'after',
+    header: 'After',
+    enableGlobalFilter: false,
+    cell: ({ row }) => {
+      const residual = residualScore(row.original);
+      return residual ? <RiskScore {...residual} /> : <NoValue>Not set</NoValue>;
+    },
+  }),
+  column.accessor((risk) => (risk.treatment ? treatmentLabels[risk.treatment] : undefined), {
+    id: 'treatment',
+    header: 'Treatment',
+    cell: ({ getValue }) => getValue() ?? <NoValue>Not set</NoValue>,
+  }),
+  column.accessor('ownerName', { id: 'owner', header: 'Risk owner' }),
+  column.accessor('reviewOn', { header: 'Review', meta: { className: dataCell } }),
+  column.accessor((risk) => (risk.confirmation ? 'Confirmed' : 'Draft'), {
+    id: 'confirmation',
+    header: 'Confirmation',
+    cell: ({ getValue }) => <StateBadge kind="confirmation" state={getValue()} />,
+  }),
+]);
+
+const closedColumns = column.columns([
+  column.accessor('ref', { header: 'ID', cell: ({ getValue }) => <Ref>{getValue()}</Ref> }),
+  column.accessor('title', {
+    header: 'Risk',
+    meta: { className: mainCell },
+    cell: ({ row: { original: risk } }) => (
+      <RecordLink to={`/risks/${risk.ref}`}>{risk.title}</RecordLink>
+    ),
+  }),
+  column.accessor('ownerName', { id: 'owner', header: 'Risk owner' }),
+  column.accessor((risk) => risk.closedAt?.slice(0, 10), {
+    id: 'closed',
+    header: 'Closed',
+    meta: { className: dataCell },
+  }),
+  column.accessor('closedReason', { header: 'Why', meta: { className: noteCell } }),
+]);
 
 export function Risks() {
   const { canEdit } = usePermissions();
@@ -106,82 +164,27 @@ export function Risks() {
         </section>
       </DetailLayout>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>ID</TableHead>
-            <TableHead>Risk</TableHead>
-            <TableHead>Before</TableHead>
-            <TableHead>After</TableHead>
-            <TableHead>Treatment</TableHead>
-            <TableHead>Risk owner</TableHead>
-            <TableHead>Review</TableHead>
-            <TableHead>Confirmation</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {risks.map((risk) => (
-            <TableRow key={risk.ref}>
-              <TableCell>
-                <Ref>{risk.ref}</Ref>
-              </TableCell>
-              <MainCell>
-                <RecordLink to={`/risks/${risk.ref}`}>{risk.title}</RecordLink>
-              </MainCell>
-              <TableCell>
-                <RiskScore likelihood={risk.likelihood} impact={risk.impact} />
-              </TableCell>
-              <ResidualCell risk={risk} />
-              {risk.treatment ? (
-                <TableCell>{treatmentLabels[risk.treatment]}</TableCell>
-              ) : (
-                <DataCell>Not set</DataCell>
-              )}
-              <TableCell>{risk.ownerName}</TableCell>
-              <DataCell>{risk.reviewOn}</DataCell>
-              <TableCell>
-                <StateBadge
-                  kind="confirmation"
-                  state={risk.confirmation ? 'Confirmed' : 'Draft'}
-                />
-              </TableCell>
-            </TableRow>
-          ))}
-          {risks.length === 0 && (
-            <EmptyRow colSpan={8}>No risks yet. Add the first one.</EmptyRow>
-          )}
-        </TableBody>
-      </Table>
+      <section aria-label="Risk register" className="flex flex-col gap-3">
+        <h2>Register</h2>
+        <DataTable
+          columns={columns}
+          data={risks}
+          getRowId={(risk) => risk.ref}
+          searchLabel="Search risks"
+          emptyText="No risks yet. Add the first one."
+        />
+      </section>
 
       {closed.length > 0 && (
         <section aria-label="Closed risks" className="flex flex-col gap-3">
           <h2>Closed risks</h2>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Risk</TableHead>
-                <TableHead>Risk owner</TableHead>
-                <TableHead>Closed</TableHead>
-                <TableHead>Why</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {closed.map((risk) => (
-                <TableRow key={risk.ref}>
-                  <TableCell>
-                    <Ref>{risk.ref}</Ref>
-                  </TableCell>
-                  <MainCell>
-                    <RecordLink to={`/risks/${risk.ref}`}>{risk.title}</RecordLink>
-                  </MainCell>
-                  <TableCell>{risk.ownerName}</TableCell>
-                  <DataCell>{risk.closedAt?.slice(0, 10)}</DataCell>
-                  <DataCell className="min-w-40 whitespace-normal">{risk.closedReason}</DataCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={closedColumns}
+            data={closed}
+            getRowId={(risk) => risk.ref}
+            paramPrefix="closed-"
+            emptyText="No closed risks."
+          />
         </section>
       )}
     </>

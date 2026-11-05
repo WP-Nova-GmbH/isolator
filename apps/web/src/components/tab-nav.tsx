@@ -39,12 +39,26 @@ export function TabNav({ label, items }: { label: string; items: TabNavItem[] })
   );
 }
 
+/**
+ * The search for a list filtered to one tab. The list's search, sort and page size stay as
+ * they are, and it starts again on its first page.
+ */
+export function tabSearch(params: URLSearchParams, tab: string | null) {
+  const next = new URLSearchParams();
+  if (tab !== null) next.set('tab', tab);
+  for (const key of ['q', 'sort', 'size']) {
+    const value = params.get(key);
+    if (value !== null) next.set(key, value);
+  }
+  return next;
+}
+
 /** Reads a list filter from the URL, so a filtered list can be linked to. */
 export function useTabFilter(tabs: { value: string; label: string }[]) {
   const [params] = useSearchParams();
   const value = params.get('tab') ?? tabs[0].value;
   const items = tabs.map((tab) => ({
-    to: `?tab=${tab.value}`,
+    to: `?${tabSearch(params, tab.value)}`,
     label: tab.label,
     active: tab.value === value,
   }));

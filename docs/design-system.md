@@ -33,6 +33,17 @@ Every tab has its own URL, so it can be linked to, bookmarked, sent to an audito
 - A tab that filters a single list is a search param on that list's route: `/incidents?tab=closed`, through `useTabFilter`.
 - Build both with `TabNav`. A form inside a tab posts to the tab's route, so the tab routes share the page's action.
 
+### Registers sort, search and page
+
+Every register is a `DataTable`: click a column heading to sort by it, type in the search box to narrow the list, and page through it 25 rows at a time. What the reader sees is kept in the URL like a tab (`?q=backup&sort=-due&page=2`), so a sorted, searched list can be linked to and comes back with Back. Changing it never reloads the page's data, except on the Audit trail.
+
+- The search box and the list's filter, its `TabNav` or a select, sit together above the table. Switching tabs keeps the search and sort, and starts again on the first page.
+- A column sorts by its value, not its label: dates by date, scores by score, Low–Medium–High as a scale (`sortByOrder`). A missing value sorts last either way.
+- A page searches its main list only, and only when the list can grow long: the Risk assessments, one a year, have no search box. A page's other lists, such as Retired assets below the register or the Tasks on a record's page, sort and page but have no search box. Their URL params carry a prefix (`?retired-sort=retired`, `?tasks-sort=due`), so two lists on one page don't share a sort.
+- Pages appear only when a list holds more than 25 records.
+- The Audit trail is too long to load whole, so the server pages and searches it (`rowCount` on `DataTable`). It stays newest first, and its search covers who, the record and the reason.
+- Tables that aren't lists keep `Table` on its own: the Readiness checklist, what goes in the Audit file, the risk criteria levels, and the preview in an import. Their order means something, and a Needs attention list is short enough to read at a glance.
+
 ## Logo
 
 The mark is a lowercase **i** inside four corner brackets.
@@ -142,6 +153,7 @@ Base components live in `components/ui/`. They started as stock shadcn and are o
 | `Button` | `ui/button.tsx` | `default` once per view; `outline` for other actions; `secondary`, `ghost` and `link` where a border is noise; `destructive` for deleting. 36 px tall by default |
 | `Badge` | `ui/badge.tsx` | `variant` is a tone: `neutral`, `success`, `warning`, `info`, `danger`. Always has a text label |
 | `Table` | `ui/table.tsx` | Registers. Bleeds 10 px past the sheet's padding, so cell text lines up with headings and hover rows reach past it |
+| `DataTable`, `columnHelper`, `sortByOrder` | `data-table.tsx` | Every register: sorting, search and pages on [TanStack Table](https://tanstack.com/table), rendered with `Table`. Columns are built once, outside the component, with `columnHelper`; a column's `meta.className` styles its cells |
 | `Alert` | `ui/alert.tsx` | `destructive` for load failures and blocking errors |
 | `Dialog` | `ui/dialog.tsx` | Every form on a page opens in one. Use it through `FormDialog` |
 | `DropdownMenu` | `ui/dropdown-menu.tsx` | The ⋯ menu on a record's page. Use it through `LifecycleMenu` |
@@ -174,7 +186,7 @@ Base components live in `components/ui/`. They started as stock shadcn and are o
 | `EntryPage` | `entry-page.tsx` | Pages outside the app: claim, sign-in, invitation |
 | `ClerkSignIn` | `clerk-sign-in.tsx` | Clerk's sign-in, inside an `EntryPage` |
 | `DetailLayout` | `detail-layout.tsx` | Main column with a side column that drops below it |
-| `MainCell`, `DataCell`, `Ref`, `RecordLink`, `TextLink` | `table-parts.tsx` | Cells and links inside registers |
+| `MainCell`, `DataCell`, `NoValue`, `Ref`, `RecordLink`, `TextLink` | `table-parts.tsx` | Cells and links inside registers. In a `DataTable` column, use the classes `mainCell`, `dataCell` and `noteCell` instead of the cell components |
 
 `Sheet`, `Separator` and `Tooltip` are installed as parts of `Sidebar`. `DropdownMenu` keeps only the parts we use; add more from shadcn when one is needed. Icons are [Lucide](https://lucide.dev): 16 px beside text, in `currentColor`.
 

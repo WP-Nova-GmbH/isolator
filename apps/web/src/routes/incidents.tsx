@@ -2,16 +2,9 @@ import { Link, useLoaderData, type LoaderFunctionArgs } from 'react-router';
 import { PageHeader } from '@/components/page-header';
 import { StateBadge } from '@/components/state-badge';
 import { TabNav, useTabFilter } from '@/components/tab-nav';
-import { DataCell, EmptyRow, MainCell, RecordLink, Ref } from '@/components/table-parts';
+import { columnHelper, DataTable } from '@/components/data-table';
+import { dataCell, mainCell, NoValue, RecordLink, Ref } from '@/components/table-parts';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { api } from '@/lib/api';
 import { usePermissions } from '@/lib/members';
 import type { Incident } from '@/lib/incidents';
@@ -21,6 +14,46 @@ const tabs = [
   { value: 'closed', label: 'Closed' },
   { value: 'all', label: 'All' },
 ];
+
+const column = columnHelper<Incident>();
+
+const columns = column.columns([
+  column.accessor('ref', { header: 'ID', cell: ({ getValue }) => <Ref>{getValue()}</Ref> }),
+  column.accessor('title', {
+    header: 'What happened',
+    meta: { className: mainCell },
+    cell: ({ row: { original: incident } }) => (
+      <RecordLink to={`/incidents/${incident.ref}`}>{incident.title}</RecordLink>
+    ),
+  }),
+  column.accessor('occurredOn', { header: 'Occurred', meta: { className: dataCell } }),
+  column.accessor('ownerName', { id: 'owner', header: 'Owner' }),
+  column.accessor((incident) => incident.risk?.ref, {
+    id: 'risk',
+    header: 'Linked risk',
+    cell: ({ getValue }) => {
+      const ref = getValue();
+      return ref ? (
+        <RecordLink to={`/risks/${ref}`} className="font-normal">
+          {ref}
+        </RecordLink>
+      ) : (
+        <NoValue>None</NoValue>
+      );
+    },
+  }),
+  column.accessor((incident) => incident.closedAt ?? undefined, {
+    id: 'closed',
+    header: 'Closed by',
+    meta: { className: dataCell },
+    cell: ({ row: { original: incident } }) =>
+      incident.closedAt ? `${incident.closedBy}, ${incident.closedAt.slice(0, 10)}` : 'Not closed',
+  }),
+  column.accessor('state', {
+    header: 'State',
+    cell: ({ getValue }) => <StateBadge kind="incident" state={getValue()} />,
+  }),
+]);
 
 export function incidentsLoader({ request }: LoaderFunctionArgs) {
   const tab = new URL(request.url).searchParams.get('tab') ?? 'open';
@@ -45,52 +78,14 @@ export function Incidents() {
           )
         }
       />
-      <TabNav label="Incident filter" items={items} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>ID</TableHead>
-            <TableHead>What happened</TableHead>
-            <TableHead>Occurred</TableHead>
-            <TableHead>Owner</TableHead>
-            <TableHead>Linked risk</TableHead>
-            <TableHead>Closed by</TableHead>
-            <TableHead>State</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {incidents.map((incident) => (
-            <TableRow key={incident.ref}>
-              <TableCell>
-                <Ref>{incident.ref}</Ref>
-              </TableCell>
-              <MainCell>
-                <RecordLink to={`/incidents/${incident.ref}`}>{incident.title}</RecordLink>
-              </MainCell>
-              <DataCell>{incident.occurredOn}</DataCell>
-              <TableCell>{incident.ownerName}</TableCell>
-              {incident.risk ? (
-                <TableCell>
-                  <RecordLink to={`/risks/${incident.risk.ref}`} className="font-normal">
-                    {incident.risk.ref}
-                  </RecordLink>
-                </TableCell>
-              ) : (
-                <DataCell>None</DataCell>
-              )}
-              <DataCell>
-                {incident.closedAt
-                  ? `${incident.closedBy}, ${incident.closedAt.slice(0, 10)}`
-                  : 'Not closed'}
-              </DataCell>
-              <TableCell>
-                <StateBadge kind="incident" state={incident.state} />
-              </TableCell>
-            </TableRow>
-          ))}
-          {incidents.length === 0 && <EmptyRow colSpan={7}>No Incidents here.</EmptyRow>}
-        </TableBody>
-      </Table>
+      <DataTable
+        columns={columns}
+        data={incidents}
+        getRowId={(incident) => incident.ref}
+        filters={<TabNav label="Incident filter" items={items} />}
+        searchLabel="Search Incidents"
+        emptyText="No Incidents here."
+      />
     </>
   );
 }
