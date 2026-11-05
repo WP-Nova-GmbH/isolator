@@ -66,10 +66,10 @@ describe('supplierAttention', () => {
       contractTerm: null,
     };
     expect(supplierAttention(unknown, [contract], 'no_concerns', today)).toEqual([
-      'Nobody owns this Supplier.',
-      'Their criticality is unknown.',
-      'Whether they handle personal data is unknown.',
-      'The contract term is unknown.',
+      'No owner',
+      'Criticality unknown',
+      'Unknown if they handle personal data',
+      'Contract term unknown',
     ]);
   });
 
@@ -79,13 +79,13 @@ describe('supplierAttention', () => {
   });
 
   it('asks for a contract', () => {
-    expect(supplierAttention(supplier, [], undefined, today)).toEqual(['No contract on file.']);
+    expect(supplierAttention(supplier, [], undefined, today)).toEqual(['No contract on file']);
   });
 
   it('asks for a data processing agreement when personal data is involved', () => {
     const handling = { ...supplier, handlesPersonalData: true };
     expect(supplierAttention(handling, [contract], undefined, today)[0]).toContain(
-      'no data processing agreement',
+      'No data processing agreement',
     );
     const agreement = { kind: 'data_processing_agreement' as const, title: 'DPA', expiresOn: null };
     expect(supplierAttention(handling, [contract, agreement], undefined, today)).toEqual([]);
@@ -99,8 +99,8 @@ describe('supplierAttention', () => {
       expiresOn: '2026-01-01',
     };
     expect(supplierAttention(handling, [contract, expired], undefined, today)).toEqual([
-      'They handle personal data, but no data processing agreement is on file.',
-      'DPA expired on 2026-01-01.',
+      'No data processing agreement',
+      'DPA expired on 2026-01-01',
     ]);
   });
 
@@ -111,7 +111,7 @@ describe('supplierAttention', () => {
       expiresOn: '2026-11-20',
     };
     expect(supplierAttention(supplier, [contract, certificate], undefined, today)).toEqual([
-      'Certificate expires on 2026-11-20.',
+      'Certificate expires on 2026-11-20',
     ]);
   });
 
@@ -119,14 +119,14 @@ describe('supplierAttention', () => {
     const attention = (contractEnds: string) =>
       supplierAttention({ ...supplier, contractEnds }, [contract], undefined, today);
     expect(attention('2027-01-01')).toEqual([]);
-    expect(attention('2026-12-31')).toEqual(['The contract ends on 2026-12-31.']);
-    expect(attention('2026-10-31')).toEqual(['The contract ended on 2026-10-31.']);
+    expect(attention('2026-12-31')).toEqual(['Contract ends on 2026-12-31']);
+    expect(attention('2026-10-31')).toEqual(['Contract ended on 2026-10-31']);
   });
 
   it('asks a critical Supplier for an exit plan', () => {
     const critical = { ...supplier, criticality: 'high' as const };
     expect(supplierAttention(critical, [contract], undefined, today)).toEqual([
-      'They are critical, but there is no exit plan.',
+      'No exit plan',
     ]);
     expect(
       supplierAttention({ ...critical, exitPlan: 'Move to X' }, [contract], undefined, today),
@@ -135,17 +135,17 @@ describe('supplierAttention', () => {
 
   it('passes on what the last review found', () => {
     expect(supplierAttention(supplier, [contract], 'concerns', today)).toEqual([
-      'The last review raised concerns.',
+      'Last review raised concerns',
     ]);
     expect(supplierAttention(supplier, [contract], 'stop_using', today)).toEqual([
-      'The last review says to stop using them.',
+      'Last review says stop using them',
     ]);
   });
 
   it('flags an overdue review', () => {
     const overdue = { ...supplier, nextReviewOn: '2026-10-15' };
     expect(supplierAttention(overdue, [contract], 'no_concerns', today)).toEqual([
-      'The review was due on 2026-10-15.',
+      'Review overdue since 2026-10-15',
     ]);
   });
 });

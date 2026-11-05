@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { Field, FieldGrid } from '@/components/field';
+import { Field, FieldGrid, FieldSection } from '@/components/field';
 import { OwnerSelect } from '@/components/owner-select';
 import { RiskScore } from '@/components/risk-score';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
@@ -63,15 +62,16 @@ function ScoreCard({
       : { likelihood: 'residualLikelihood', impact: 'residualImpact' };
 
   return (
-    <Card className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-2">
-        <h2>{title}</h2>
-        {l && i ? (
+    <FieldSection
+      title={title}
+      aside={
+        l && i ? (
           <RiskScore likelihood={Number(l)} impact={Number(i)} />
         ) : (
           <span className="text-muted-foreground">Not set</span>
-        )}
-      </div>
+        )
+      }
+    >
       <div className="grid grid-cols-2 gap-4">
         <LevelSelect
           name={names.likelihood}
@@ -88,7 +88,7 @@ function ScoreCard({
           onChange={setI}
         />
       </div>
-    </Card>
+    </FieldSection>
   );
 }
 
@@ -98,7 +98,7 @@ export function RiskFields({ risk }: { risk?: RiskDetail }) {
 
   return (
     <>
-      <Card aria-label="Risk" className="flex flex-col gap-4">
+      <FieldSection label="Risk">
         <Field label="Title" htmlFor="title">
           <Input id="title" name="title" defaultValue={risk?.title} required />
         </Field>
@@ -129,7 +129,7 @@ export function RiskFields({ risk }: { risk?: RiskDetail }) {
             />
           </Field>
         </FieldGrid>
-      </Card>
+      </FieldSection>
 
       <section
         aria-label="Scores"

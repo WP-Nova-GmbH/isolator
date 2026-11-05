@@ -1,3 +1,13 @@
+# 1.1.0 (2026-11-05)
+## Features
+- __api,web:__ import and export the asset and Supplier registers as CSV (8dad28b)
+- __api,web:__ link an asset to many Suppliers (682acee)
+- __web:__ make a Supplier's tabs routes (263d7f7)
+- __web:__ declutter record pages (16ab60d)
+- __web:__ show records read-only and change them in dialogs (1aeba85)
+## Bug Fixes
+- __web:__ renew the Clerk session when the user is back, not on click (651317b)
+- __api,web:__ make the Suppliers page scannable (d6af6c9)
 # 1.0.0 (2026-11-04)
 ## Features
 - __api,web:__ give Members roles (4e70a8d)

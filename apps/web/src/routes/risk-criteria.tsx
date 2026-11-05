@@ -1,19 +1,11 @@
-import {
-  Form,
-  useActionData,
-  useLoaderData,
-  useNavigation,
-  type ActionFunctionArgs,
-} from 'react-router';
-import { Field } from '@/components/field';
-import { FormError } from '@/components/form-error';
+import { useLoaderData, type ActionFunctionArgs } from 'react-router';
+import { Fact, Facts } from '@/components/facts';
+import { Field, FieldSection } from '@/components/field';
+import { EditDialog } from '@/components/form-dialog';
 import { PageHeader } from '@/components/page-header';
 import { RiskChip, type RiskBand } from '@/components/risk-score';
 import { RiskTabs } from '@/components/tab-nav';
 import { MainCell, Ref } from '@/components/table-parts';
-import { Alert, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -52,15 +44,7 @@ export async function riskCriteriaAction({ request }: ActionFunctionArgs) {
   );
 }
 
-function LevelTable({
-  title,
-  name,
-  levels,
-}: {
-  title: string;
-  name: string;
-  levels: string[];
-}) {
+function LevelTable({ title, levels }: { title: string; levels: string[] }) {
   return (
     <section aria-label={`${title} levels`} className="flex flex-col gap-3">
       <h2>{title}</h2>
@@ -77,14 +61,7 @@ function LevelTable({
               <TableCell>
                 <Ref>{index + 1}</Ref>
               </TableCell>
-              <MainCell>
-                <Input
-                  name={name}
-                  aria-label={`${title} ${index + 1}`}
-                  defaultValue={meaning}
-                  required
-                />
-              </MainCell>
+              <MainCell>{meaning}</MainCell>
             </TableRow>
           ))}
         </TableBody>
@@ -93,11 +70,46 @@ function LevelTable({
   );
 }
 
+function LevelFields({ title, name, levels }: { title: string; name: string; levels: string[] }) {
+  return (
+    <FieldSection title={title}>
+      {levels.map((meaning, index) => (
+        <Field key={index} label={`${title} ${index + 1}`} htmlFor={`${name}-${index}`}>
+          <Input id={`${name}-${index}`} name={name} defaultValue={meaning} required />
+        </Field>
+      ))}
+    </FieldSection>
+  );
+}
+
+/** The criteria's fields, in the Edit dialog. */
+function CriteriaFields({ criteria }: { criteria: Criteria }) {
+  return (
+    <>
+      <Field
+        label="Highest score you accept without treatment"
+        htmlFor="threshold"
+        className="max-w-68"
+      >
+        <Input
+          id="threshold"
+          name="acceptanceThreshold"
+          type="number"
+          min={1}
+          max={25}
+          defaultValue={criteria.acceptanceThreshold}
+          required
+        />
+      </Field>
+      <LevelFields title="Likelihood" name="likelihoodLevels" levels={criteria.likelihoodLevels} />
+      <LevelFields title="Impact" name="impactLevels" levels={criteria.impactLevels} />
+    </>
+  );
+}
+
 export function RiskCriteria() {
   const { canEdit } = usePermissions();
   const criteria = useLoaderData<typeof riskCriteriaLoader>();
-  const result = useActionData<typeof riskCriteriaAction>();
-  const navigation = useNavigation();
 
   return (
     <>
@@ -106,56 +118,35 @@ export function RiskCriteria() {
         description="The 5 × 5 matrix is fixed. The threshold and the meaning of each level are yours."
         actions={
           canEdit && (
-            <Button type="submit" form="criteria-form" disabled={navigation.state !== 'idle'}>
-              Save criteria
-            </Button>
+            <EditDialog title="Edit risk criteria" label="Edit criteria">
+              <CriteriaFields criteria={criteria} />
+            </EditDialog>
           )
         }
       />
       <RiskTabs />
 
-      <FormError message={result?.error} />
-      {result?.saved && navigation.state === 'idle' && (
-        <Alert>
-          <AlertTitle>Risk criteria saved</AlertTitle>
-        </Alert>
-      )}
+      <section aria-label="Acceptance threshold" className="flex flex-col gap-4">
+        <h2>Acceptance threshold</h2>
+        <Facts>
+          <Fact label="Highest score you accept without treatment">
+            {criteria.acceptanceThreshold}
+          </Fact>
+        </Facts>
+        <div className="flex flex-wrap items-center gap-2">
+          {bands.map(({ band, scores, label }) => (
+            <span key={band} className="flex items-center gap-2 pr-2">
+              <RiskChip band={band}>{scores}</RiskChip>
+              <span className="text-muted-foreground">{label}</span>
+            </span>
+          ))}
+        </div>
+      </section>
 
-      <Form id="criteria-form" method="post" className="flex flex-col gap-6">
-        <fieldset disabled={!canEdit} className="contents">
-          <Card aria-label="Acceptance threshold" className="flex flex-col gap-4">
-            <h2>Acceptance threshold</h2>
-            <Field
-              label="Highest score you accept without treatment"
-              htmlFor="threshold"
-              className="max-w-68"
-            >
-              <Input
-                id="threshold"
-                name="acceptanceThreshold"
-                type="number"
-                min={1}
-                max={25}
-                defaultValue={criteria.acceptanceThreshold}
-                required
-              />
-            </Field>
-            <div className="flex flex-wrap items-center gap-2">
-              {bands.map(({ band, scores, label }) => (
-                <span key={band} className="flex items-center gap-2 pr-2">
-                  <RiskChip band={band}>{scores}</RiskChip>
-                  <span className="text-muted-foreground">{label}</span>
-                </span>
-              ))}
-            </div>
-          </Card>
-
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(20rem,100%),1fr))] gap-8">
-            <LevelTable title="Likelihood" name="likelihoodLevels" levels={criteria.likelihoodLevels} />
-            <LevelTable title="Impact" name="impactLevels" levels={criteria.impactLevels} />
-          </div>
-        </fieldset>
-      </Form>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(20rem,100%),1fr))] gap-8">
+        <LevelTable title="Likelihood" levels={criteria.likelihoodLevels} />
+        <LevelTable title="Impact" levels={criteria.impactLevels} />
+      </div>
     </>
   );
 }

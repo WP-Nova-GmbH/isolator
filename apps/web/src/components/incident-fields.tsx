@@ -1,6 +1,5 @@
-import { Field, FieldGrid } from '@/components/field';
+import { Field, FieldGrid, FieldSection } from '@/components/field';
 import { OwnerSelect } from '@/components/owner-select';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,7 +21,7 @@ export function IncidentFields({ incident, risks }: IncidentFieldsProps) {
   const offered = risks.some((risk) => risk.ref === linkedRisk?.ref);
 
   return (
-    <Card aria-label="Incident" className="flex flex-col gap-4">
+    <FieldSection label="Incident">
       <Field label="What happened" htmlFor="title">
         <Input id="title" name="title" defaultValue={incident?.title} required />
       </Field>
@@ -59,6 +58,6 @@ export function IncidentFields({ incident, risks }: IncidentFieldsProps) {
           </NativeSelect>
         </Field>
       </FieldGrid>
-    </Card>
+    </FieldSection>
   );
 }

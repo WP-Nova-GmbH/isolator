@@ -1,23 +1,24 @@
 import { useState } from 'react';
 import {
-  Form,
   Link,
   redirect,
   useActionData,
   useLoaderData,
-  useNavigation,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
 } from 'react-router';
 import { ConfirmationCard } from '@/components/confirmation-card';
 import { DetailLayout } from '@/components/detail-layout';
+import { Fact, Facts } from '@/components/facts';
+import { EditDialog } from '@/components/form-dialog';
 import { FormError } from '@/components/form-error';
 import { HistoryList } from '@/components/history-list';
-import { LifecycleCard, type LifecycleAction } from '@/components/lifecycle-card';
+import { LifecycleMenu, type LifecycleAction } from '@/components/lifecycle-menu';
 import { LinkedItem, LinkPicker } from '@/components/link-picker';
 import { NewTaskForm } from '@/components/new-task-form';
 import { PageHeader, SectionHeader } from '@/components/page-header';
 import { RiskFields } from '@/components/risk-fields';
+import { RiskScore } from '@/components/risk-score';
 import { StateBadge } from '@/components/state-badge';
 import { Ref } from '@/components/table-parts';
 import { TasksTable } from '@/components/tasks-table';
@@ -29,8 +30,10 @@ import { historyItems } from '@/lib/audit';
 import { useAppData, usePermissions } from '@/lib/members';
 import { taskIntent } from '@/lib/tasks';
 import {
+  residualScore,
   riskPayload,
   toTask,
+  treatmentLabels,
   type ApiTask,
   type RiskDetail as Risk,
 } from '@/lib/risks';
@@ -69,9 +72,6 @@ export async function riskDetailAction({ request, params }: ActionFunctionArgs) 
       case 'save':
         return api(path, { method: 'PUT', body: riskPayload(form) });
       case 'confirm':
-        // Saves first, so what is on screen is what gets confirmed. A Reviewer's form is locked
-        // and sends no fields, so there is nothing to save.
-        if (form.has('title')) await api(path, { method: 'PUT', body: riskPayload(form) });
         return api(`${path}/confirmations`, { method: 'POST' });
       case 'close':
         return api(`${path}/closure`, { method: 'POST', body: { reason } });
@@ -101,7 +101,6 @@ function confirmationCardProps(risk: Risk, memberId: string) {
     return {
       text: `${lead}Confirm this rating and treatment as the risk owner.`,
       action: 'Confirm rating',
-      form: 'risk-form',
     };
   }
   return {
@@ -109,6 +108,18 @@ function confirmationCardProps(risk: Risk, memberId: string) {
     action: 'Confirm rating',
     disabled: true,
   };
+}
+
+/** A score with what it is made of. */
+function Score({ likelihood, impact }: { likelihood: number; impact: number }) {
+  return (
+    <span className="flex items-center gap-2">
+      <RiskScore likelihood={likelihood} impact={impact} />
+      <span className="text-muted-foreground">
+        Likelihood {likelihood}, impact {impact}
+      </span>
+    </span>
+  );
 }
 
 function lifecycleProps(risk: Risk, isOwner: boolean) {
@@ -163,12 +174,12 @@ export function RiskDetail() {
   const { risk, tasks, assets, controls } = useLoaderData<typeof riskDetailLoader>();
   const { me } = useAppData();
   const result = useActionData<typeof riskDetailAction>();
-  const navigation = useNavigation();
   const [addingTask, setAddingTask] = useState(false);
   const closed = risk.closedAt !== null;
   const { canEdit } = usePermissions();
   const locked = closed || !canEdit;
 
+  const residual = residualScore(risk);
   const linkedAssets = new Set(risk.assets.map((asset) => asset.id));
   const linkedControls = new Set(risk.controls.map((control) => control.id));
 
@@ -179,11 +190,19 @@ export function RiskDetail() {
         eyebrow={<Ref>{risk.ref}</Ref>}
         back={{ to: '/risks', label: 'Risks' }}
         actions={
-          closed ? (
-            <StateBadge kind="risk" state="Closed" />
-          ) : (
-            <StateBadge kind="confirmation" state={risk.confirmation ? 'Confirmed' : 'Draft'} />
-          )
+          <>
+            {closed ? (
+              <StateBadge kind="risk" state="Closed" />
+            ) : (
+              <StateBadge kind="confirmation" state={risk.confirmation ? 'Confirmed' : 'Draft'} />
+            )}
+            {!locked && (
+              <EditDialog title="Edit risk">
+                <RiskFields risk={risk} />
+              </EditDialog>
+            )}
+            <LifecycleMenu {...lifecycleProps(risk, risk.ownerId === me.id)} />
+          </>
         }
       />
       <FormError message={result?.error} />
@@ -198,10 +217,6 @@ export function RiskDetail() {
         aside={
           <>
             {!closed && <ConfirmationCard {...confirmationCardProps(risk, me.id)} />}
-            <LifecycleCard
-              key={String(closed)}
-              {...lifecycleProps(risk, risk.ownerId === me.id)}
-            />
             <Card aria-label="History" className="flex flex-col gap-3">
               <h2>History</h2>
               <HistoryList items={historyItems(risk.history)} />
@@ -209,24 +224,22 @@ export function RiskDetail() {
           </>
         }
       >
-        <Form id="risk-form" method="post" className="flex flex-col gap-6">
-          <fieldset disabled={locked} className="contents">
-            <RiskFields key={risk.ref} risk={risk} />
-          </fieldset>
-          {!locked && (
-            <div>
-              <Button
-                type="submit"
-                name="intent"
-                value="save"
-                variant="outline"
-                disabled={navigation.state !== 'idle'}
-              >
-                Save changes
-              </Button>
-            </div>
-          )}
-        </Form>
+        <section aria-label="Risk">
+          <Facts>
+            <Fact label="What could happen" empty="Not described yet" wide>
+              {risk.description}
+            </Fact>
+            <Fact label="Before treatment">
+              <Score likelihood={risk.likelihood} impact={risk.impact} />
+            </Fact>
+            <Fact label="After treatment">
+              {residual && <Score {...residual} />}
+            </Fact>
+            <Fact label="Risk treatment">{risk.treatment && treatmentLabels[risk.treatment]}</Fact>
+            <Fact label="Risk owner">{risk.ownerName}</Fact>
+            <Fact label="Review on">{risk.reviewOn}</Fact>
+          </Facts>
+        </section>
 
         <section className="flex flex-col gap-3">
           <SectionHeader title="Treatment Tasks">

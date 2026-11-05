@@ -14,8 +14,8 @@ import {
   InviteError,
 } from './routes/accept-invite';
 import { AssetDetail, assetDetailAction, assetDetailLoader } from './routes/asset-detail';
-import { AssetNew, assetNewAction, assetNewLoader } from './routes/asset-new';
-import { Assets, assetsLoader } from './routes/assets';
+import { AssetNew, assetNewAction } from './routes/asset-new';
+import { Assets, assetsAction, assetsLoader } from './routes/assets';
 import { AuditFile, auditFileLoader } from './routes/audit-file';
 import { AuditTrail, auditTrailLoader } from './routes/audit-trail';
 import { Claim, claimAction, claimLoader } from './routes/claim';
@@ -56,9 +56,17 @@ import { Risks, risksLoader } from './routes/risks';
 import { SignIn, signInLoader } from './routes/sign-in';
 import { Soa, soaAction, soaLoader } from './routes/soa';
 import { SoaEntry, soaEntryAction, soaEntryLoader } from './routes/soa-entry';
-import { SupplierDetail, supplierDetailAction, supplierDetailLoader } from './routes/supplier-detail';
+import {
+  SupplierAssets,
+  SupplierDetail,
+  supplierDetailAction,
+  supplierDetailLoader,
+  SupplierFiles,
+  SupplierReviews,
+  SupplierTasks,
+} from './routes/supplier-detail';
 import { SupplierNew, supplierNewAction } from './routes/supplier-new';
-import { Suppliers, suppliersLoader } from './routes/suppliers';
+import { Suppliers, suppliersAction, suppliersLoader } from './routes/suppliers';
 import { Tasks, tasksAction, tasksLoader } from './routes/tasks';
 
 const routes: RouteObject[] = [
@@ -106,10 +114,9 @@ const routes: RouteObject[] = [
             action: riskDetailAction,
             element: <RiskDetail />,
           },
-          { path: 'assets', loader: assetsLoader, element: <Assets /> },
+          { path: 'assets', loader: assetsLoader, action: assetsAction, element: <Assets /> },
           {
             path: 'assets/new',
-            loader: assetNewLoader,
             action: assetNewAction,
             element: <AssetNew />,
           },
@@ -119,13 +126,25 @@ const routes: RouteObject[] = [
             action: assetDetailAction,
             element: <AssetDetail />,
           },
-          { path: 'suppliers', loader: suppliersLoader, element: <Suppliers /> },
+          {
+            path: 'suppliers',
+            loader: suppliersLoader,
+            action: suppliersAction,
+            element: <Suppliers />,
+          },
           { path: 'suppliers/new', action: supplierNewAction, element: <SupplierNew /> },
           {
             path: 'suppliers/:ref',
             loader: supplierDetailLoader,
             action: supplierDetailAction,
             element: <SupplierDetail />,
+            // Each tab is a route. A form inside a tab posts to it, so each shares the action.
+            children: [
+              { index: true, action: supplierDetailAction, element: <SupplierFiles /> },
+              { path: 'reviews', action: supplierDetailAction, element: <SupplierReviews /> },
+              { path: 'tasks', action: supplierDetailAction, element: <SupplierTasks /> },
+              { path: 'assets', action: supplierDetailAction, element: <SupplierAssets /> },
+            ],
           },
           {
             path: 'evidence',

@@ -183,6 +183,13 @@
       "when": 1793821837947,
       "tag": "0025_member_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793830180805,
+      "tag": "0026_asset_suppliers",
+      "breakpoints": true
     }
   ]
 }

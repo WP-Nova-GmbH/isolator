@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { eq, inArray } from 'drizzle-orm';
 import { createDb } from './client';
 import {
+  assetSuppliers,
   assets,
   auditEvents,
   controls,
@@ -125,16 +126,16 @@ const sampleAssets: {
   classification: 'public' | 'internal' | 'confidential' | 'strictly_confidential' | null;
   owner: string | null;
   technicalOwner?: string;
-  supplier?: string;
+  suppliers?: string[];
   status?: 'planned';
   location?: string;
   validated?: boolean;
   source?: string;
 }[] = [
-  { name: 'Customer data', type: 'information', classification: 'strictly_confidential', owner: 'Anna Keller', technicalOwner: 'Jonas Weber', location: 'Microsoft 365, Germany', validated: true, source: 'ISMS kick-off workshop' },
-  { name: 'Source code', type: 'information', classification: 'confidential', owner: 'Jonas Weber', supplier: 'GitHub', validated: true, source: 'ISMS kick-off workshop' },
-  { name: 'Microsoft 365', type: 'service', classification: 'confidential', owner: 'Jonas Weber', technicalOwner: 'Jonas Weber', supplier: 'Microsoft', location: 'EU data boundary', validated: true, source: 'Licence overview' },
-  { name: 'Hetzner cloud servers', type: 'service', classification: 'confidential', owner: 'Jonas Weber', technicalOwner: 'Jonas Weber', supplier: 'Hetzner', location: 'Falkenstein, Germany', validated: true, source: 'Hetzner console export' },
+  { name: 'Customer data', type: 'information', classification: 'strictly_confidential', owner: 'Anna Keller', technicalOwner: 'Jonas Weber', suppliers: ['Microsoft', 'Hetzner'], location: 'Microsoft 365 and Hetzner servers, Germany', validated: true, source: 'ISMS kick-off workshop' },
+  { name: 'Source code', type: 'information', classification: 'confidential', owner: 'Jonas Weber', suppliers: ['GitHub'], validated: true, source: 'ISMS kick-off workshop' },
+  { name: 'Microsoft 365', type: 'service', classification: 'confidential', owner: 'Jonas Weber', technicalOwner: 'Jonas Weber', suppliers: ['Microsoft'], location: 'EU data boundary', validated: true, source: 'Licence overview' },
+  { name: 'Hetzner cloud servers', type: 'service', classification: 'confidential', owner: 'Jonas Weber', technicalOwner: 'Jonas Weber', suppliers: ['Hetzner'], location: 'Falkenstein, Germany', validated: true, source: 'Hetzner console export' },
   { name: 'Staff laptops', type: 'hardware', classification: 'internal', owner: 'Lea Fischer', technicalOwner: 'Lea Fischer', location: 'Home offices', source: 'Device management export' },
   { name: 'Admin staff', type: 'people', classification: 'internal', owner: 'Anna Keller', validated: true },
   { name: 'Home offices', type: 'site', classification: 'internal', owner: 'Anna Keller' },
@@ -516,11 +517,19 @@ async function main() {
           validation: asset.validated ? ('validated' as const) : ('unvalidated' as const),
           source: asset.source ?? '',
           organizationId,
-          supplierId: asset.supplier ? supplierIds.get(asset.supplier) : null,
         })),
       )
       .returning();
     const assetId = (name: string) => insertedAssets.find((asset) => asset.name === name)!.id;
+    await tx.insert(assetSuppliers).values(
+      sampleAssets.flatMap((asset) =>
+        (asset.suppliers ?? []).map((supplier) => ({
+          organizationId,
+          assetId: assetId(asset.name),
+          supplierId: supplierIds.get(supplier)!,
+        })),
+      ),
+    );
 
     const catalog = await tx
       .select({ id: controls.id, ref: controls.ref })

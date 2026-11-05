@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import {
-  Form,
   useActionData,
   useLoaderData,
-  useNavigation,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
 } from 'react-router';
@@ -11,9 +9,11 @@ import { ConfirmationCard } from '@/components/confirmation-card';
 import { DetailLayout } from '@/components/detail-layout';
 import { EvidenceForm } from '@/components/evidence-form';
 import { EvidenceTable } from '@/components/evidence-table';
+import { Fact, Facts } from '@/components/facts';
 import { Field, FieldGrid } from '@/components/field';
+import { EditDialog } from '@/components/form-dialog';
 import { FormError } from '@/components/form-error';
-import { OwnerSelect } from '@/components/owner-select';
+import { OwnerSelect, UNASSIGNED } from '@/components/owner-select';
 import { HistoryList } from '@/components/history-list';
 import { NewTaskForm } from '@/components/new-task-form';
 import { PageHeader, SectionHeader } from '@/components/page-header';
@@ -59,9 +59,6 @@ export async function soaEntryAction({ request, params }: ActionFunctionArgs) {
       case 'save':
         return api(path, { method: 'PUT', body: soaEntryPayload(form) });
       case 'confirm':
-        // Saves first, so what is on screen is what gets confirmed. A Reviewer's form is locked
-        // and sends no fields, so there is nothing to save.
-        if (form.has('status')) await api(path, { method: 'PUT', body: soaEntryPayload(form) });
         return api(`${path}/confirmations`, { method: 'POST' });
       case 'add-evidence':
         return addEvidence(form, params.ref!);
@@ -83,15 +80,48 @@ function confirmationProps(entry: SoaEntryDetail) {
       ? 'This entry changed since its last Confirmation. Confirm it to record the change.'
       : 'This entry has no Confirmation yet.',
     action: 'Confirm entry',
-    form: 'soa-form',
   };
+}
+
+/** The decision's fields, in the Edit dialog. soaEntryPayload reads them back out. */
+function DecisionFields({ entry }: { entry: SoaEntryDetail }) {
+  return (
+    <>
+      <FieldGrid>
+        <Field label="Applies" htmlFor="applicable">
+          <NativeSelect
+            id="applicable"
+            name="applicable"
+            defaultValue={entry.applicable ? 'yes' : 'no'}
+          >
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </NativeSelect>
+        </Field>
+        <Field label="Implementation status" htmlFor="status">
+          <NativeSelect id="status" name="status" defaultValue={entry.status}>
+            {Object.entries(statusLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
+        <Field label="Owner" htmlFor="ownerId">
+          <OwnerSelect id="ownerId" name="ownerId" defaultValue={entry.ownerId} unassigned />
+        </Field>
+      </FieldGrid>
+      <Field label="Justification" htmlFor="justification">
+        <Textarea id="justification" name="justification" defaultValue={entry.justification} />
+      </Field>
+    </>
+  );
 }
 
 export function SoaEntry() {
   const { entry, evidence, tasks, documents } = useLoaderData<typeof soaEntryLoader>();
   const { canEdit } = usePermissions();
   const result = useActionData<typeof soaEntryAction>();
-  const navigation = useNavigation();
   const [adding, setAdding] = useState<'evidence' | 'task' | null>(null);
 
   return (
@@ -104,6 +134,11 @@ export function SoaEntry() {
           <>
             <StateBadge kind="control" state={controlState(entry)} />
             <StateBadge kind="confirmation" state={entry.confirmation ? 'Confirmed' : 'Draft'} />
+            {canEdit && (
+              <EditDialog title={`Edit ${entry.ref}`}>
+                <DecisionFields entry={entry} />
+              </EditDialog>
+            )}
           </>
         }
       />
@@ -138,62 +173,19 @@ export function SoaEntry() {
           </>
         }
       >
-        <Form id="soa-form" method="post" className="flex flex-col gap-6">
-          <fieldset disabled={!canEdit} className="contents">
-            <Card aria-label="Decision" className="flex flex-col gap-4">
-              <h2>Decision</h2>
-              <FieldGrid>
-                <Field label="Applies" htmlFor="applicable">
-                  <NativeSelect
-                    id="applicable"
-                    name="applicable"
-                    defaultValue={entry.applicable ? 'yes' : 'no'}
-                  >
-                    <option value="yes">Yes</option>
-                    <option value="no">No</option>
-                  </NativeSelect>
-                </Field>
-                <Field label="Implementation status" htmlFor="status">
-                  <NativeSelect id="status" name="status" defaultValue={entry.status}>
-                    {Object.entries(statusLabels).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </Field>
-                <Field label="Owner" htmlFor="ownerId">
-                  <OwnerSelect
-                    id="ownerId"
-                    name="ownerId"
-                    defaultValue={entry.ownerId}
-                    unassigned
-                  />
-                </Field>
-              </FieldGrid>
-              <Field label="Justification" htmlFor="justification">
-                <Textarea
-                  id="justification"
-                  name="justification"
-                  defaultValue={entry.justification}
-                />
-              </Field>
-            </Card>
-          </fieldset>
-          {canEdit && (
-            <div>
-              <Button
-                type="submit"
-                name="intent"
-                value="save"
-                variant="outline"
-                disabled={navigation.state !== 'idle'}
-              >
-                Save changes
-              </Button>
-            </div>
-          )}
-        </Form>
+        <section aria-label="Decision" className="flex flex-col gap-4">
+          <h2>Decision</h2>
+          <Facts>
+            <Fact label="Applies">{entry.applicable ? 'Yes' : 'No'}</Fact>
+            <Fact label="Implementation status">{statusLabels[entry.status]}</Fact>
+            <Fact label="Owner" empty={UNASSIGNED}>
+              {entry.ownerName}
+            </Fact>
+            <Fact label="Justification" empty="None yet" wide>
+              {entry.justification}
+            </Fact>
+          </Facts>
+        </section>
 
         <section className="flex flex-col gap-3">
           <SectionHeader title="Evidence">

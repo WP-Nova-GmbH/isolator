@@ -5,9 +5,14 @@ interface TabNavItem {
   to: string;
   label: string;
   active: boolean;
+  /** How many records the tab holds, shown beside its label. */
+  count?: number;
 }
 
-/** Segmented tabs made of links: each tab is a route or a filter in the URL. */
+/**
+ * Segmented tabs made of links. Every tab has its own URL: a part of a page is a route
+ * (/suppliers/S-03/reviews), a filter of one list is a search param (?tab=closed).
+ */
 export function TabNav({ label, items }: { label: string; items: TabNavItem[] }) {
   return (
     <nav
@@ -20,11 +25,14 @@ export function TabNav({ label, items }: { label: string; items: TabNavItem[] })
           to={item.to}
           aria-current={item.active ? 'page' : undefined}
           className={cn(
-            'rounded-[0.4375rem] px-3 py-1.25 font-medium text-muted-foreground transition-colors hover:text-foreground',
+            'inline-flex items-center gap-1.5 rounded-[0.4375rem] px-3 py-1.25 font-medium text-muted-foreground transition-colors hover:text-foreground',
             item.active && 'bg-surface text-foreground shadow-xs ring-1 ring-border',
           )}
         >
           {item.label}
+          {item.count !== undefined && (
+            <span className="text-xs text-muted-foreground tabular-nums">{item.count}</span>
+          )}
         </Link>
       ))}
     </nav>

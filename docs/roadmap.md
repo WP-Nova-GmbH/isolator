@@ -24,6 +24,7 @@ Isolator has to carry an ISMS from nothing to a certificate and beyond. The phas
 - [x] Risk criteria
 - [x] Asset register
 - [x] Supplier register: reviews, contracts and certificates, linked assets, risks and Tasks
+- [x] Asset and Supplier registers from a CSV file: download, change in a spreadsheet, preview and import
 - [x] Risk register with likelihood × impact matrix, scores before and after treatment, risk owners, linked assets and controls
 - [x] Risk assessments
 - [x] Tasks on risks, SoA entries, Suppliers, Incidents and Nonconformities
@@ -47,7 +48,7 @@ Isolator has to carry an ISMS from nothing to a certificate and beyond. The phas
 - [ ] Scan framework: background workers, findings → risks/evidence
 - [ ] First integrations: Microsoft 365 / Entra ID, Google Workspace, AWS, external attack surface
 - [ ] AI-drafted proposals for recurring risk assessments
-- [ ] Import of an existing SoA and risk register
+- [ ] Import of an existing SoA and risk register. Imported ratings, treatments and applicability are decisions, so each needs a Confirmation before it counts
 
 ## Open questions
 

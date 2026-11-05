@@ -1,22 +1,22 @@
 import { useState } from 'react';
 import {
-  Form,
   redirect,
   useActionData,
   useLoaderData,
-  useNavigation,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
 } from 'react-router';
 import { DetailLayout } from '@/components/detail-layout';
+import { Fact, Facts } from '@/components/facts';
+import { EditDialog } from '@/components/form-dialog';
 import { FormError } from '@/components/form-error';
 import { HistoryList } from '@/components/history-list';
 import { IncidentFields } from '@/components/incident-fields';
-import { LifecycleCard, type LifecycleAction } from '@/components/lifecycle-card';
+import { LifecycleMenu, type LifecycleAction } from '@/components/lifecycle-menu';
 import { NewTaskForm } from '@/components/new-task-form';
 import { PageHeader, SectionHeader } from '@/components/page-header';
 import { StateBadge } from '@/components/state-badge';
-import { Ref } from '@/components/table-parts';
+import { RecordLink, Ref } from '@/components/table-parts';
 import { TasksTable } from '@/components/tasks-table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -96,7 +96,6 @@ function lifecycleProps(incident: Incident) {
 export function IncidentDetail() {
   const { incident, tasks, risks } = useLoaderData<typeof incidentDetailLoader>();
   const result = useActionData<typeof incidentDetailAction>();
-  const navigation = useNavigation();
   const [addingTask, setAddingTask] = useState(false);
   const closed = incident.closedAt !== null;
   const { canEdit } = usePermissions();
@@ -108,7 +107,17 @@ export function IncidentDetail() {
         title={incident.title}
         eyebrow={<Ref>{incident.ref}</Ref>}
         back={{ to: '/incidents', label: 'Incidents' }}
-        actions={<StateBadge kind="incident" state={incident.state} />}
+        actions={
+          <>
+            <StateBadge kind="incident" state={incident.state} />
+            {!locked && (
+              <EditDialog title="Edit Incident">
+                <IncidentFields incident={incident} risks={risks} />
+              </EditDialog>
+            )}
+            <LifecycleMenu {...lifecycleProps(incident)} />
+          </>
+        }
       />
       <FormError message={result?.error} />
       {closed && (
@@ -123,7 +132,6 @@ export function IncidentDetail() {
       <DetailLayout
         aside={
           <>
-            <LifecycleCard key={String(closed)} {...lifecycleProps(incident)} />
             <Card aria-label="History" className="flex flex-col gap-3">
               <h2>History</h2>
               <HistoryList items={historyItems(incident.history)} />
@@ -131,24 +139,22 @@ export function IncidentDetail() {
           </>
         }
       >
-        <Form method="post" className="flex flex-col gap-6">
-          <fieldset disabled={locked} className="contents">
-            <IncidentFields key={incident.ref} incident={incident} risks={risks} />
-          </fieldset>
-          {!locked && (
-            <div>
-              <Button
-                type="submit"
-                name="intent"
-                value="save"
-                variant="outline"
-                disabled={navigation.state !== 'idle'}
-              >
-                Save changes
-              </Button>
-            </div>
-          )}
-        </Form>
+        <section aria-label="Incident">
+          <Facts>
+            <Fact label="Details" empty="None" wide>
+              {incident.description}
+            </Fact>
+            <Fact label="Occurred on">{incident.occurredOn}</Fact>
+            <Fact label="Owner">{incident.ownerName}</Fact>
+            <Fact label="Linked risk" empty="None">
+              {incident.risk && (
+                <RecordLink to={`/risks/${incident.risk.ref}`} className="font-normal">
+                  {incident.risk.ref} {incident.risk.title}
+                </RecordLink>
+              )}
+            </Fact>
+          </Facts>
+        </section>
 
         <section className="flex flex-col gap-3">
           <SectionHeader title="Tasks">

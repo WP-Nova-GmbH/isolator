@@ -1,4 +1,5 @@
-import { Link, useLoaderData } from 'react-router';
+import { Link, useLoaderData, type ActionFunctionArgs } from 'react-router';
+import { ImportButton } from '@/components/import-dialog';
 import { PageHeader } from '@/components/page-header';
 import { StateBadge } from '@/components/state-badge';
 import { DataCell, EmptyRow, MainCell, RecordLink, Ref } from '@/components/table-parts';
@@ -12,6 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { api } from '@/lib/api';
+import { importAction } from '@/lib/imports';
 import { useAppData, usePermissions } from '@/lib/members';
 import { contractEndLabel, criticalityLabels, type Supplier } from '@/lib/suppliers';
 import { UNASSIGNED, UNKNOWN } from '@/components/owner-select';
@@ -22,6 +24,10 @@ export async function suppliersLoader() {
     api<Supplier[]>('/suppliers?state=ended'),
   ]);
   return { suppliers, ended };
+}
+
+export async function suppliersAction({ request }: ActionFunctionArgs) {
+  return importAction('/suppliers', await request.formData());
 }
 
 export function Suppliers() {
@@ -37,9 +43,12 @@ export function Suppliers() {
         description={`Outside companies ${me.organizationName} relies on, and the assets each one provides.`}
         actions={
           canEdit && (
-            <Button asChild>
-              <Link to="/suppliers/new">Add Supplier</Link>
-            </Button>
+            <>
+              <ImportButton records="Suppliers" path="/suppliers" refColumn="Ref" />
+              <Button asChild>
+                <Link to="/suppliers/new">Add Supplier</Link>
+              </Button>
+            </>
           )
         }
       />
@@ -50,11 +59,16 @@ export function Suppliers() {
           <TableBody>
             {needsAttention.map((supplier) => (
               <TableRow key={supplier.ref}>
-                <TableCell>
+                <TableCell className="w-0">
                   <RecordLink to={`/suppliers/${supplier.ref}`}>{supplier.name}</RecordLink>
                 </TableCell>
                 <DataCell className="min-w-60 whitespace-normal">
-                  {supplier.attention.join(' ')}
+                  {/* The dot trails each item, so a wrapped line starts with an item, not a dot. */}
+                  <ul className="flex flex-wrap gap-x-2 gap-y-0.5 [&>li:not(:last-child)]:after:ml-2 [&>li:not(:last-child)]:after:content-['·']">
+                    {supplier.attention.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
                 </DataCell>
               </TableRow>
             ))}
@@ -89,7 +103,9 @@ export function Suppliers() {
                 <MainCell>
                   <RecordLink to={`/suppliers/${supplier.ref}`}>{supplier.name}</RecordLink>
                   {supplier.provides && (
-                    <div className="text-xs text-muted-foreground">{supplier.provides}</div>
+                    <div className="line-clamp-1 text-xs text-muted-foreground" title={supplier.provides}>
+                      {supplier.provides}
+                    </div>
                   )}
                 </MainCell>
                 {supplier.criticality ? (

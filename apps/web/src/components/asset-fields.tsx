@@ -1,6 +1,5 @@
-import { Field, FieldGrid } from '@/components/field';
+import { Field, FieldGrid, FieldSection } from '@/components/field';
 import { OwnerSelect, UNKNOWN } from '@/components/owner-select';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,11 +11,9 @@ import {
   type AssetDetail,
 } from '@/lib/assets';
 import { useAppData } from '@/lib/members';
-import type { Supplier } from '@/lib/suppliers';
 
 interface AssetFieldsProps {
   asset?: AssetDetail;
-  suppliers: Supplier[];
 }
 
 function Options({ labels }: { labels: Record<string, string> }) {
@@ -28,12 +25,12 @@ function Options({ labels }: { labels: Record<string, string> }) {
 }
 
 /** The fields of an asset. Goes inside a form; assetPayload reads them back out. */
-export function AssetFields({ asset, suppliers }: AssetFieldsProps) {
+export function AssetFields({ asset }: AssetFieldsProps) {
   const { me } = useAppData();
 
   return (
     <>
-      <Card aria-label="Asset" className="flex flex-col gap-4">
+      <FieldSection label="Asset">
         <Field label="Name" htmlFor="name">
           <Input id="name" name="name" defaultValue={asset?.name} required />
         </Field>
@@ -74,28 +71,13 @@ export function AssetFields({ asset, suppliers }: AssetFieldsProps) {
               unassigned
             />
           </Field>
-          <Field label="Supplier that provides it" htmlFor="supplierRef">
-            <NativeSelect
-              id="supplierRef"
-              name="supplierRef"
-              defaultValue={asset?.supplier?.ref ?? ''}
-            >
-              <option value="">None</option>
-              {suppliers.map((supplier) => (
-                <option key={supplier.ref} value={supplier.ref}>
-                  {supplier.name}
-                </option>
-              ))}
-            </NativeSelect>
-          </Field>
         </FieldGrid>
         <Field label="Locations: offices, data centres, cloud regions" htmlFor="location">
           <Input id="location" name="location" defaultValue={asset?.location} />
         </Field>
-      </Card>
+      </FieldSection>
 
-      <Card aria-label="Record" className="flex flex-col gap-4">
-        <h2>Record</h2>
+      <FieldSection title="Record">
         <FieldGrid>
           <Field label="Validation" htmlFor="validation">
             <NativeSelect
@@ -118,7 +100,7 @@ export function AssetFields({ asset, suppliers }: AssetFieldsProps) {
         <Field label="Notes" htmlFor="notes">
           <Textarea id="notes" name="notes" defaultValue={asset?.notes} />
         </Field>
-      </Card>
+      </FieldSection>
     </>
   );
 }

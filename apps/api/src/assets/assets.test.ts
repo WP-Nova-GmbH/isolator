@@ -15,7 +15,7 @@ import { AssetsService, type AssetInput } from './assets.service';
 const { db, client } = createDb(testDatabaseUrl());
 const trail = new AuditTrailService(db);
 const suppliers = new SuppliersService(db, trail, testFiles(db).files);
-const assets = new AssetsService(db, suppliers, trail);
+const assets = new AssetsService(db, trail);
 const risks = new RisksService(db, new RiskCriteriaService(db), trail);
 
 const membersService = new MembersService(db);
@@ -56,7 +56,6 @@ function input(ownerId: string, overrides: Partial<AssetInput> = {}): AssetInput
     ownerId,
     technicalOwnerId: null,
     location: '',
-    supplierRef: null,
     validation: 'unvalidated',
     source: '',
     notes: '',
@@ -121,7 +120,8 @@ describe('retiring an asset', () => {
   it('takes it off its Supplier, so the Supplier can end', async () => {
     const org = await organization();
     const { ref } = await suppliers.create(org.owner, supplierInput(org.owner.id));
-    const { id } = await assets.create(org.owner, input(org.owner.id, { supplierRef: ref }));
+    const { id } = await assets.create(org.owner, input(org.owner.id));
+    await suppliers.linkAsset(org.owner, ref, id);
     await assets.retire(org.owner, id, 'Gone');
     expect((await suppliers.get(org.id, ref)).assets).toEqual([]);
     await expect(suppliers.end(org.owner, ref, 'Moved')).resolves.toEqual({ ref });
@@ -222,7 +222,7 @@ describe('assets', () => {
         id,
         name: 'CRM',
         ownerName: 'Owner',
-        supplier: null,
+        suppliers: [],
         risks: 0,
       }),
     ]);
@@ -284,24 +284,44 @@ describe('assets', () => {
     ]);
   });
 
-  it('link to the Supplier that provides them', async () => {
+  it('link to every Supplier they depend on', async () => {
     const org = await organization();
-    const { ref } = await suppliers.create(org.owner, supplierInput(org.owner.id));
-    const { id } = await assets.create(org.owner, input(org.owner.id, { supplierRef: ref }));
-    expect((await assets.get(org.id, id)).supplier).toEqual({ ref, name: 'CRM Ltd' });
-    expect((await suppliers.get(org.id, ref)).assets.map((asset) => asset.id)).toEqual([id]);
+    const cloud = await suppliers.create(org.owner, supplierInput(org.owner.id));
+    const partner = await suppliers.create(org.owner, {
+      ...supplierInput(org.owner.id),
+      name: 'Ops Partner',
+    });
+    const { id } = await assets.create(org.owner, input(org.owner.id));
+    await suppliers.linkAsset(org.owner, partner.ref, id);
+    await suppliers.linkAsset(org.owner, cloud.ref, id);
+    await suppliers.linkAsset(org.owner, cloud.ref, id);
 
-    await assets.update(org.owner, id, input(org.owner.id));
-    expect((await assets.get(org.id, id)).supplier).toBeNull();
+    expect((await assets.get(org.id, id)).suppliers).toEqual([
+      { ref: cloud.ref, name: 'CRM Ltd' },
+      { ref: partner.ref, name: 'Ops Partner' },
+    ]);
+    expect((await assets.list(org.id))[0].suppliers).toHaveLength(2);
+    expect((await suppliers.get(org.id, cloud.ref)).assets.map((asset) => asset.id)).toEqual([id]);
+    expect((await suppliers.get(org.id, partner.ref)).assets.map((asset) => asset.id)).toEqual([
+      id,
+    ]);
+
+    // Editing the asset leaves its Suppliers alone.
+    await assets.update(org.owner, id, input(org.owner.id, { name: 'CRM system' }));
+    expect((await assets.get(org.id, id)).suppliers).toHaveLength(2);
+
+    await suppliers.unlinkAsset(org.owner, cloud.ref, id);
+    expect((await assets.get(org.id, id)).suppliers).toEqual([
+      { ref: partner.ref, name: 'Ops Partner' },
+    ]);
   });
 
   it('refuse a Supplier that has ended', async () => {
     const org = await organization();
     const { ref } = await suppliers.create(org.owner, supplierInput(org.owner.id));
+    const { id } = await assets.create(org.owner, input(org.owner.id));
     await suppliers.end(org.owner, ref, 'Gone');
-    await expect(
-      assets.create(org.owner, input(org.owner.id, { supplierRef: ref })),
-    ).rejects.toThrow('Resume');
+    await expect(suppliers.linkAsset(org.owner, ref, id)).rejects.toThrow('Resume');
   });
 
   it('stay within the Organization', async () => {
@@ -317,9 +337,7 @@ describe('assets', () => {
     await expect(
       assets.create(a.owner, input(a.owner.id, { technicalOwnerId: b.owner.id })),
     ).rejects.toThrow('Choose an owner');
-    await expect(
-      assets.create(a.owner, input(a.owner.id, { supplierRef: 'S-99' })),
-    ).rejects.toThrow('does not exist');
-    expect(ref).toBe('S-01');
+    await expect(suppliers.linkAsset(b.owner, ref, id)).rejects.toThrow('Choose an asset');
+    expect((await assets.get(a.id, id)).suppliers).toEqual([]);
   });
 });

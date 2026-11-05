@@ -3,9 +3,11 @@ import { afterAll, describe, expect, it } from 'vitest';
 import type { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { eq } from 'drizzle-orm';
+import { AssetsController } from '../assets/assets.controller';
 import type { Auth, AuthSession, Person } from '../auth/auth';
 import { createDb } from '../db/client';
 import { members, organizations, sessions, users } from '../db/schema';
+import { SuppliersController } from '../suppliers/suppliers.controller';
 import { testDatabaseUrl } from '../test/database';
 import {
   AllowedFor,
@@ -35,8 +37,11 @@ interface TestRequest {
   user?: CurrentUser;
 }
 
+/** A controller method, or a stand-in for one, with its decorators. */
+type Handler = (...args: never[]) => unknown;
+
 /** A request to a route. `handler` stands in for the controller method, with its decorators. */
-function requestWith(authorization?: string, method = 'GET', handler: () => void = () => {}) {
+function requestWith(authorization?: string, method = 'GET', handler: Handler = () => {}) {
   const request: TestRequest = { method, headers: { authorization } };
   const context = {
     switchToHttp: () => ({ getRequest: () => request }),
@@ -86,7 +91,7 @@ async function memberWith(role: Role) {
   const authorization = signIn();
   const user = await signedInUser(authorization);
   await join(user.id, 'Test', role);
-  return (method: string, handler?: () => void) =>
+  return (method: string, handler?: Handler) =>
     memberGuard.canActivate(requestWith(authorization, method, handler).context);
 }
 
@@ -203,6 +208,18 @@ describe('roles', () => {
     await expect((await memberWith('editor'))('POST', administration)).rejects.toThrow(
       'Only an Administrator can do this.',
     );
+  });
+
+  it('let Administrators and Editors import a register, and every Member export it', async () => {
+    for (const Controller of [AssetsController, SuppliersController]) {
+      const { previewImport, import: importFile, export: exportFile } = Controller.prototype;
+      for (const route of [previewImport, importFile]) {
+        await expect((await memberWith('editor'))('POST', route)).resolves.toBe(true);
+        await expect((await memberWith('reviewer'))('POST', route)).rejects.toThrow('Reviewer');
+        await expect((await memberWith('auditor'))('POST', route)).rejects.toThrow('Auditor');
+      }
+      await expect((await memberWith('auditor'))('GET', exportFile)).resolves.toBe(true);
+    }
   });
 
   it('put the role on the Member', async () => {

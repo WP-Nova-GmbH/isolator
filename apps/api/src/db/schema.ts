@@ -505,8 +505,6 @@ export const assets = pgTable(
     classification: classification('classification'),
     // Where it is: offices, data centres, cloud regions.
     location: text('location').notNull().default(''),
-    // The Supplier that provides this asset, if any.
-    supplierId: uuid('supplier_id'),
     validation: assetValidation('validation').notNull().default('unvalidated'),
     // Where the record came from, such as an inventory export or an interview.
     source: text('source').notNull().default(''),
@@ -530,11 +528,30 @@ export const assets = pgTable(
       columns: [t.organizationId, t.technicalOwnerId],
       foreignColumns: [members.organizationId, members.id],
     }),
+  ],
+);
+
+// The Suppliers an asset depends on, such as the cloud provider and the partner who runs it.
+export const assetSuppliers = pgTable(
+  'asset_suppliers',
+  {
+    organizationId: uuid('organization_id').notNull(),
+    assetId: uuid('asset_id').notNull(),
+    supplierId: uuid('supplier_id').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.assetId, t.supplierId] }),
+    index('asset_suppliers_supplier_idx').on(t.supplierId),
     foreignKey({
-      name: 'assets_supplier_fk',
+      name: 'asset_suppliers_asset_fk',
+      columns: [t.organizationId, t.assetId],
+      foreignColumns: [assets.organizationId, assets.id],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'asset_suppliers_supplier_fk',
       columns: [t.organizationId, t.supplierId],
       foreignColumns: [suppliers.organizationId, suppliers.id],
-    }),
+    }).onDelete('cascade'),
   ],
 );
 

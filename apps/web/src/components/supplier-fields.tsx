@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { Field, FieldGrid } from '@/components/field';
+import { Field, FieldGrid, FieldSection } from '@/components/field';
 import { OwnerSelect, UNKNOWN, yesNoValue } from '@/components/owner-select';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,7 +20,7 @@ export function SupplierFields({ supplier }: { supplier?: SupplierDetail }) {
 
   return (
     <>
-      <Card aria-label="Supplier" className="flex flex-col gap-4">
+      <FieldSection label="Supplier">
         <Field label="Name" htmlFor="name">
           <Input id="name" name="name" defaultValue={supplier?.name} required />
         </Field>
@@ -63,10 +62,9 @@ export function SupplierFields({ supplier }: { supplier?: SupplierDetail }) {
             </NativeSelect>
           </Field>
         </FieldGrid>
-      </Card>
+      </FieldSection>
 
-      <Card aria-label="Contract and contact" className="flex flex-col gap-4">
-        <h2>Contract and contact</h2>
+      <FieldSection title="Contract and contact">
         <FieldGrid>
           <Field label="Contract term" htmlFor="contractTerm">
             <NativeSelect
@@ -110,7 +108,7 @@ export function SupplierFields({ supplier }: { supplier?: SupplierDetail }) {
         <Field label="Exit plan: what you do if they go away" htmlFor="exitPlan">
           <Textarea id="exitPlan" name="exitPlan" defaultValue={supplier?.exitPlan} />
         </Field>
-      </Card>
+      </FieldSection>
     </>
   );
 }

@@ -1,6 +1,5 @@
-import { Field, FieldGrid } from '@/components/field';
+import { Field, FieldGrid, FieldSection } from '@/components/field';
 import { OwnerSelect } from '@/components/owner-select';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,7 +30,7 @@ export function DocumentFields({ document, contentLocked = false }: DocumentFiel
   const { me } = useAppData();
 
   return (
-    <Card aria-label="Document content" className="flex flex-col gap-4">
+    <FieldSection label="Document content">
       <Field label="Title" htmlFor="title">
         <Input id="title" name="title" defaultValue={document?.title} required />
       </Field>
@@ -67,6 +66,6 @@ export function DocumentFields({ document, contentLocked = false }: DocumentFiel
           readOnly={contentLocked}
         />
       </Field>
-    </Card>
+    </FieldSection>
   );
 }

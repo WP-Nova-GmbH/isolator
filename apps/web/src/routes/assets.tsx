@@ -1,4 +1,5 @@
-import { Link, useLoaderData } from 'react-router';
+import { Link, useLoaderData, type ActionFunctionArgs } from 'react-router';
+import { ImportButton } from '@/components/import-dialog';
 import { PageHeader } from '@/components/page-header';
 import { DataCell, EmptyRow, MainCell, RecordLink } from '@/components/table-parts';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import {
 import { UNASSIGNED, UNKNOWN } from '@/components/owner-select';
 import { api } from '@/lib/api';
 import { assetTypeLabels, classificationLabels, type Asset } from '@/lib/assets';
+import { importAction } from '@/lib/imports';
 import { useAppData, usePermissions } from '@/lib/members';
 
 export async function assetsLoader() {
@@ -21,6 +23,10 @@ export async function assetsLoader() {
     api<Asset[]>('/assets?state=retired'),
   ]);
   return { assets, retired };
+}
+
+export async function assetsAction({ request }: ActionFunctionArgs) {
+  return importAction('/assets', await request.formData());
 }
 
 /** What still has to happen before the record can be relied on. */
@@ -42,12 +48,20 @@ export function Assets() {
     <>
       <PageHeader
         title="Assets"
-        description={`What ${me.organizationName} needs to protect, who owns it, and which Supplier provides it.`}
+        description={`What ${me.organizationName} needs to protect, who owns it, and which Suppliers it depends on.`}
         actions={
           canEdit && (
-            <Button asChild>
-              <Link to="/assets/new">Add asset</Link>
-            </Button>
+            <>
+              <ImportButton
+                records="assets"
+                path="/assets"
+                refColumn="ID"
+                note="Import your Suppliers first, so the Suppliers column can name them."
+              />
+              <Button asChild>
+                <Link to="/assets/new">Add asset</Link>
+              </Button>
+            </>
           )
         }
       />
@@ -58,7 +72,7 @@ export function Assets() {
             <TableHead>Type</TableHead>
             <TableHead>Classification</TableHead>
             <TableHead>Business owner</TableHead>
-            <TableHead>Supplier</TableHead>
+            <TableHead>Suppliers</TableHead>
             <TableHead>Open risks</TableHead>
           </TableRow>
         </TableHeader>
@@ -80,11 +94,16 @@ export function Assets() {
               ) : (
                 <DataCell>{UNASSIGNED}</DataCell>
               )}
-              {asset.supplier ? (
+              {asset.suppliers.length > 0 ? (
                 <TableCell>
-                  <RecordLink to={`/suppliers/${asset.supplier.ref}`} className="font-normal">
-                    {asset.supplier.name}
-                  </RecordLink>
+                  {asset.suppliers.map((supplier, index) => (
+                    <span key={supplier.ref}>
+                      {index > 0 && ', '}
+                      <RecordLink to={`/suppliers/${supplier.ref}`} className="font-normal">
+                        {supplier.name}
+                      </RecordLink>
+                    </span>
+                  ))}
                 </TableCell>
               ) : (
                 <DataCell>None</DataCell>

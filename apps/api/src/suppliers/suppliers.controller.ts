@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   HttpCode,
   Inject,
   Param,
@@ -10,11 +11,15 @@ import {
   Post,
   Put,
   Query,
+  UploadedFile,
   UseGuards,
 } from '@nestjs/common';
 import { z } from 'zod';
+import type { Upload } from '../files/files.service';
+import { csvFile, CsvUpload } from '../imports/register-import';
 import { Member, MemberGuard, type CurrentMember } from '../members/current-member';
 import { parseBody, reasonInput } from '../validation';
+import { SupplierImportService } from './supplier-import.service';
 import {
   supplierFileInput,
   supplierInput,
@@ -27,7 +32,10 @@ const linkInput = z.object({ id: z.uuid('Choose one from the list.') });
 @Controller('suppliers')
 @UseGuards(MemberGuard)
 export class SuppliersController {
-  constructor(@Inject(SuppliersService) private readonly suppliers: SuppliersService) {}
+  constructor(
+    @Inject(SuppliersService) private readonly suppliers: SuppliersService,
+    @Inject(SupplierImportService) private readonly imports: SupplierImportService,
+  ) {}
 
   @Get()
   list(@Member() member: CurrentMember, @Query('state') state?: string) {
@@ -37,6 +45,29 @@ export class SuppliersController {
   @Post()
   create(@Member() member: CurrentMember, @Body() body: unknown) {
     return this.suppliers.create(member, parseBody(supplierInput, body));
+  }
+
+  // Before ':ref', which would take "export" for a ref.
+  @Get('export')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header('Content-Disposition', 'attachment; filename="suppliers.csv"')
+  export(@Member() member: CurrentMember) {
+    return this.imports.export(member.organizationId);
+  }
+
+  /** What importing the file would do. Changes nothing. */
+  @Post('import/preview')
+  @HttpCode(200)
+  @CsvUpload()
+  previewImport(@Member() member: CurrentMember, @UploadedFile() upload?: Upload) {
+    return this.imports.preview(member.organizationId, csvFile(upload));
+  }
+
+  @Post('import')
+  @HttpCode(200)
+  @CsvUpload()
+  import(@Member() member: CurrentMember, @UploadedFile() upload?: Upload) {
+    return this.imports.apply(member, csvFile(upload));
   }
 
   @Get(':ref')

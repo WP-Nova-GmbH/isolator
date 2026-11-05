@@ -158,6 +158,7 @@ function describeAssetChange(before: Value, after: Value) {
     changes.push(ownerChange('Technical owner', after.technicalOwnerName));
   }
   if (changed('location')) changes.push('Locations changed');
+  // Only in events from before an asset could have several Suppliers.
   if (changed('supplierRef')) {
     changes.push(after.supplierRef ? `Supplier changed to ${String(after.supplierRef)}` : 'Supplier removed');
   }

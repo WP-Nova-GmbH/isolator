@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
 import { AuditTrailService } from '../audit/audit-trail';
 import { createDb } from '../db/client';
-import { assets, members, organizations, users } from '../db/schema';
+import { assetSuppliers, assets, members, organizations, users } from '../db/schema';
 import type { CurrentMember } from '../members/current-member';
 import { MembersService } from '../members/members.service';
 import { NonconformitiesService } from '../nonconformities/nonconformities.service';
@@ -160,8 +160,8 @@ describe('what nobody knows yet', () => {
       contractTerm: null,
       contractEnds: null,
     });
-    expect(supplier.attention).toContain('The contract term is unknown.');
-    expect(supplier.attention).toContain('Nobody owns this Supplier.');
+    expect(supplier.attention).toContain('Contract term unknown');
+    expect(supplier.attention).toContain('No owner');
   });
 
   it('tells a rolling contract from an unknown one, and needs an end date for a fixed one', () => {
@@ -217,11 +217,11 @@ describe('reviews', () => {
     const { ref } = await suppliers.create(org.owner, input(org.owner.id));
     await suppliers.addReview(org.owner, ref, { ...review, outcome: 'concerns' });
     expect((await suppliers.get(org.id, ref)).attention).toContain(
-      'The last review raised concerns.',
+      'Last review raised concerns',
     );
     await suppliers.addReview(org.owner, ref, { ...review, reviewedOn: '2026-02-01' });
     expect((await suppliers.get(org.id, ref)).attention).not.toContain(
-      'The last review raised concerns.',
+      'Last review raised concerns',
     );
   });
 });
@@ -230,7 +230,7 @@ describe('files', () => {
   it('count towards what is on file, and the trail keeps what was removed', async () => {
     const org = await organization();
     const { ref } = await suppliers.create(org.owner, input(org.owner.id));
-    expect((await suppliers.get(org.id, ref)).attention).toContain('No contract on file.');
+    expect((await suppliers.get(org.id, ref)).attention).toContain('No contract on file');
 
     await suppliers.addFile(org.owner, ref, file);
     const supplier = await suppliers.get(org.id, ref);
@@ -315,21 +315,27 @@ describe('uploaded files', () => {
 });
 
 describe('assets and risks', () => {
-  it('link an asset to one Supplier, and show the risks that follow from it', async () => {
+  it('link an asset to several Suppliers, and show the risks that follow from it', async () => {
     const org = await organization();
     const first = await suppliers.create(org.owner, input(org.owner.id));
     const second = await suppliers.create(org.owner, input(org.owner.id));
     await suppliers.linkAsset(org.owner, first.ref, org.asset.id);
-    await expect(suppliers.linkAsset(org.owner, second.ref, org.asset.id)).rejects.toThrow(
-      'Another Supplier',
-    );
+    await suppliers.linkAsset(org.owner, second.ref, org.asset.id);
 
     const { ref } = await risks.create(org.owner, riskInput(org.owner.id));
     await risks.linkAsset(org.owner, ref, org.asset.id);
-    const supplier = await suppliers.get(org.id, first.ref);
-    expect(supplier.assets.map((asset) => asset.name)).toEqual(['Mail']);
-    expect(supplier.risks.map((risk) => risk.ref)).toEqual([ref]);
-    expect(supplier.assetCount).toBe(1);
+    for (const linked of [first, second]) {
+      const supplier = await suppliers.get(org.id, linked.ref);
+      expect(supplier.assets.map((asset) => asset.name)).toEqual(['Mail']);
+      expect(supplier.risks.map((risk) => risk.ref)).toEqual([ref]);
+      expect(supplier.assetCount).toBe(1);
+    }
+    expect((await suppliers.list(org.id)).map((supplier) => supplier.assetCount)).toEqual([1, 1]);
+    expect(
+      (await suppliers.get(org.id, first.ref)).history.filter(
+        (event) => event.action === 'supplier.asset_linked',
+      ),
+    ).toHaveLength(1);
 
     await risks.close(org.owner, ref, 'Gone');
     expect((await suppliers.get(org.id, first.ref)).risks).toEqual([]);
@@ -489,7 +495,10 @@ describe('tenancy', () => {
     await expect(suppliers.create(a.owner, input(b.owner.id))).rejects.toThrow('Choose an owner');
     const { ref } = await suppliers.create(a.owner, input(a.owner.id));
     await expect(suppliers.linkAsset(a.owner, ref, b.asset.id)).rejects.toThrow('Choose an asset');
-    const [asset] = await db.select().from(assets).where(eq(assets.id, b.asset.id));
-    expect(asset.supplierId).toBeNull();
+    const links = await db
+      .select()
+      .from(assetSuppliers)
+      .where(eq(assetSuppliers.assetId, b.asset.id));
+    expect(links).toEqual([]);
   });
 });

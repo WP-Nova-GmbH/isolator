@@ -31,8 +31,13 @@ export async function withUpload<T>(
 }
 
 /** Fetches through the API so the Member is checked, then hands the browser the file. */
-export async function downloadFile({ id, name }: { id: string; name: string }) {
-  const response = await apiResponse(`/files/${id}`);
+export function downloadFile({ id, name }: { id: string; name: string }) {
+  return downloadFrom(`/files/${id}`, name);
+}
+
+/** Saves what an API path returns as a file with this name. */
+export async function downloadFrom(path: string, name: string) {
+  const response = await apiResponse(path);
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement('a');
   link.href = url;

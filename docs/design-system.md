@@ -4,6 +4,35 @@ Isolator is used by the person who carries an ISMS: often an IT lead or office m
 
 Tokens live in [apps/web/src/index.css](../apps/web/src/index.css). Logo artwork lives in [docs/brand/](brand/). Components are [shadcn/ui](https://ui.shadcn.com) on Radix, restyled to these rules, in [apps/web/src/components/ui/](../apps/web/src/components/ui/); our own components sit one level up in [apps/web/src/components/](../apps/web/src/components/).
 
+## Pages show, dialogs change
+
+This is the rule every page follows. A page shows the ISMS as it stands. The ISMS is read far more often than it is changed: by the person who keeps it, by colleagues, and by an auditor. So a page reads like the audit file it is: facts, not form fields.
+
+- **A record's page opens read-only.** Its fields are facts, a label above a value. An empty fact says so plainly ("Unknown", "Unassigned", "None yet"), where a blank input would hide it.
+- **Changing it is a decision.** **Edit**, in the page header, opens the record's fields in a dialog with Cancel and Save changes. Nothing changes until Save, and Cancel or Escape leaves the record as it was.
+- **Everything else that takes input works the same way.** Adding a file, a review, a Task or Evidence, ending or deleting a record, changing a Member's role, inviting someone: each opens a dialog from a button.
+- **No inputs sit open on a page.** There are two exceptions. Controls that only change what you see, such as a filter or the language, stay on the page. So do pages whose only job is to create something, such as Add Supplier.
+- **Confirming confirms what the page shows,** which is what is saved.
+
+A page full of inputs looks unfinished, invites changes nobody meant to make, and hides which facts are missing. A dialog makes each change deliberate and easy to back out of, and the Audit trail records only what someone meant to do.
+
+Build the read-only view with `Facts`, a record's Edit dialog with `EditDialog`, and any other form with `FormDialog`. Field components such as `SupplierFields` group their fields with `FieldSection`: a card on a create page, a plain group inside a dialog.
+
+A record's page is laid out so that it never feels crowded:
+
+- **Header:** the record's name, with a one-line description under it when there is one (what a Supplier provides). On the right: its state, **Edit**, and a ⋯ menu for rare actions such as ending, closing or deleting it.
+- **Facts:** directly on the sheet, without a box.
+- **Related records** (files, reviews, Tasks, linked assets): below the facts. When there are several kinds, they go in tabs with a count each, one shown at a time. The open tab's action, such as Add file, sits to the right of the tabs.
+- **Side column:** what needs the reader, such as a Confirmation or what needs attention, and the record's History.
+
+### Tabs are routes
+
+Every tab has its own URL, so it can be linked to, bookmarked, sent to an auditor, and reached again with Back. A tab is never state held in a component.
+
+- A tab that shows a part of a page is a nested route. The first tab is the index: `/suppliers/S-03` shows the files, and `/suppliers/S-03/reviews` the reviews. The page's route owns the header, the facts and the tabs, and renders the open tab with `<Outlet>`.
+- A tab that filters a single list is a search param on that list's route: `/incidents?tab=closed`, through `useTabFilter`.
+- Build both with `TabNav`. A form inside a tab posts to the tab's route, so the tab routes share the page's action.
+
 ## Logo
 
 The mark is a lowercase **i** inside four corner brackets.
@@ -100,7 +129,7 @@ Base styles set the headings: page title 26 px, section 15 px. Body and table te
 ## Shape and space
 
 - Radius: `rounded-sm` (6 px) for score chips, `rounded-md` (8 px) for buttons and inputs, `rounded-lg` (12 px) for cards and the page sheet, `rounded-xl` (16 px) for the sign-in card. Status badges are `rounded-full`.
-- The navigation sits on the ground and each page is one raised sheet. Borders separate things inside the sheet. Tables sit directly on the sheet, without a box.
+- The navigation sits on the ground and each page is one raised sheet. Borders separate things inside the sheet. Tables and a record's facts sit directly on the sheet, without a box. Cards are for the side column and for small groups of linked records.
 - Depth comes from four tokens, so it follows the theme: `shadow-xs` for raised controls, `shadow-button` for primary buttons, `shadow-sheet` for the page sheet, `shadow-float` for things that float.
 - Space with flex/grid `gap`, on Tailwind's 4 px scale. Registers and the SoA stay dense, with `py-2` cells; forms use `gap-4`.
 
@@ -114,34 +143,40 @@ Base components live in `components/ui/`. They started as stock shadcn and are o
 | `Badge` | `ui/badge.tsx` | `variant` is a tone: `neutral`, `success`, `warning`, `info`, `danger`. Always has a text label |
 | `Table` | `ui/table.tsx` | Registers. Bleeds 10 px past the sheet's padding, so cell text lines up with headings and hover rows reach past it |
 | `Alert` | `ui/alert.tsx` | `destructive` for load failures and blocking errors |
+| `Dialog` | `ui/dialog.tsx` | Every form on a page opens in one. Use it through `FormDialog` |
+| `DropdownMenu` | `ui/dropdown-menu.tsx` | The ⋯ menu on a record's page. Use it through `LifecycleMenu` |
 | `Skeleton` | `ui/skeleton.tsx` | Loading states. The pulse stops under `prefers-reduced-motion` |
 | `Sidebar` | `ui/sidebar.tsx` | App shell, `inset` variant. A 240 px rail on desktop, a sheet on phones |
 | `Input`, `Textarea`, `NativeSelect` | `ui/` | 36 px tall to line up with `Button` |
-| `Label`, `Card` | `ui/` | `Card` is a bordered section; give it its own layout with `flex flex-col gap-*` |
+| `Label`, `Card` | `ui/` | `Card` is a bordered section for the side column or a small group of linked records; give it its own layout with `flex flex-col gap-*` |
 | `Logo`, `Mark` | `logo.tsx` | Theme-aware SVG |
 | `RiskScore`, `RiskChip`, `riskBand` | `risk-score.tsx` | Tinted chip in the risk band's colour |
 | `RiskMatrix` | `risk-matrix.tsx` | The fixed 5 × 5 matrix |
 | `StateBadge` | `state-badge.tsx` | `Badge` for a domain state. The only place states map to tones |
 | `PageHeader`, `SectionHeader` | `page-header.tsx` | Title, description and actions |
-| `TabNav`, `RiskTabs`, `useTabFilter` | `tab-nav.tsx` | Segmented tabs made of links: routes, or a filter in the URL |
+| `TabNav`, `RiskTabs`, `useTabFilter` | `tab-nav.tsx` | The only tabs: segmented links, each to its own URL. A part of a page is a route, a filter of one list a search param. Give an item a `count` to show how many records it holds |
 | `StatGrid`, `StatTile` | `stat-tile.tsx` | Summary numbers on a sunken tile |
 | `HistoryList` | `history-list.tsx` | Timeline of Confirmations or Document versions |
-| `ConfirmationCard` | `confirmation-card.tsx` | The same card on every record that needs a Confirmation. Give it `form` to save what's on screen as part of confirming |
+| `ConfirmationCard` | `confirmation-card.tsx` | The same card on every record that needs a Confirmation. Confirms the record as saved, which is what the page shows |
 | `RiskFields` | `risk-fields.tsx` | A risk's fields and live scores. Goes inside a form |
-| `TasksTable`, `NewTaskForm` | `tasks-table.tsx`, `new-task-form.tsx` | Tasks on the Tasks page and on a record |
+| `TasksTable`, `NewTaskForm` | `tasks-table.tsx`, `new-task-form.tsx` | Tasks on the Tasks page and on a record. Adding, committing and cancelling open dialogs |
 | `FormError` | `form-error.tsx` | Shows why the API refused what a Member tried |
-| `LifecycleCard` | `lifecycle-card.tsx` | Closing, ending, reopening or deleting a record, each with a reason |
+| `LifecycleMenu` | `lifecycle-menu.tsx` | The ⋯ menu beside Edit: closing, ending, reopening or deleting a record. Asks for the reason in a dialog |
 | `LinkPicker`, `LinkedItem` | `link-picker.tsx` | Linking records to each other and removing the link |
-| `SupplierFields`, `AssetFields`, `IncidentFields`, `NonconformityFields`, `DocumentFields` | `supplier-fields.tsx`, `asset-fields.tsx`, `incident-fields.tsx`, `nonconformity-fields.tsx`, `document-fields.tsx` | A record's fields. Go inside a form |
-| `EvidenceTable`, `EvidenceForm` | `evidence-table.tsx`, `evidence-form.tsx` | Evidence on the Evidence page and on an SoA entry |
+| `SupplierFields`, `AssetFields`, `IncidentFields`, `NonconformityFields`, `DocumentFields` | `supplier-fields.tsx`, `asset-fields.tsx`, `incident-fields.tsx`, `nonconformity-fields.tsx`, `document-fields.tsx` | A record's fields. Go inside a form: the create page's, or an `EditDialog` |
+| `EvidenceTable`, `EvidenceForm` | `evidence-table.tsx`, `evidence-form.tsx` | Evidence on the Evidence page and on an SoA entry. The form is a dialog |
 | `CopyLink` | `copy-link.tsx` | An invitation link, shown once |
-| `Field`, `FieldGrid` | `field.tsx` | Label and control, and a grid of them |
+| `Field`, `FieldGrid`, `FieldSection` | `field.tsx` | Label and control, a grid of them, and a titled group of them: a card on a page, plain inside a dialog |
+| `Facts`, `Fact` | `facts.tsx` | A record's read-only view, laid out like `FieldGrid`. `wide` for notes; `empty` names a missing value |
+| `FormDialog`, `FormDialogBody`, `FormDialogFooter` | `form-dialog.tsx` | A form in a dialog. Render it only while open, so it starts from the record as it is. The form inside takes `className="contents"` |
+| `EditDialog` | `form-dialog.tsx` | The Edit button on a record's page and the dialog it opens. Posts the fields with intent=save, and closes once saved |
+| `InvitationDialog` | `invitation-dialog.tsx` | Creates an invitation link and shows it in the dialog, once |
 | `EntryPage` | `entry-page.tsx` | Pages outside the app: claim, sign-in, invitation |
 | `ClerkSignIn` | `clerk-sign-in.tsx` | Clerk's sign-in, inside an `EntryPage` |
 | `DetailLayout` | `detail-layout.tsx` | Main column with a side column that drops below it |
 | `MainCell`, `DataCell`, `Ref`, `RecordLink`, `TextLink` | `table-parts.tsx` | Cells and links inside registers |
 
-`Sheet`, `Separator` and `Tooltip` are installed as parts of `Sidebar`. Icons are [Lucide](https://lucide.dev): 16 px beside text, in `currentColor`.
+`Sheet`, `Separator` and `Tooltip` are installed as parts of `Sidebar`. `DropdownMenu` keeps only the parts we use; add more from shadcn when one is needed. Icons are [Lucide](https://lucide.dev): 16 px beside text, in `currentColor`.
 
 ### Adding shadcn components
 
