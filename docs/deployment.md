@@ -45,6 +45,7 @@ DATABASE_URL=postgres://isolator:choose-a-password@db.example.com:5432/isolator?
 APP_URL=https://isolator.example.com
 CLERK_PUBLISHABLE_KEY=pk_live_...
 CLERK_SECRET_KEY=sk_live_...
+CLERK_JWT_KEY=-----BEGIN PUBLIC KEY-----MIIBIjANBgkqh...IDAQAB-----END PUBLIC KEY-----
 ```
 
 | Setting | Meaning |
@@ -53,6 +54,7 @@ CLERK_SECRET_KEY=sk_live_...
 | `APP_URL` | The exact address people open, with `https://` and no trailing slash. Isolator only accepts sign-ins made there. |
 | `CLERK_PUBLISHABLE_KEY` | From **API keys** in the Clerk Dashboard, for your production instance. |
 | `CLERK_SECRET_KEY` | From the same page. Anyone holding it can act for your whole Clerk instance. |
+| `CLERK_JWT_KEY` | Recommended. The **JWT public key** from the same page, in PEM format, on one line. With it Isolator checks sign-ins without asking Clerk. Without it, Isolator fetches Clerk's keys again after five minutes, and a slow connection to Clerk then holds up the first page someone opens after a break. The key is public, not a secret. |
 
 In the Clerk Dashboard, ask for first and last name at sign-up. The Audit trail records people by name, and shows their email when they have none.
 
@@ -304,6 +306,7 @@ Leave `DOCKER_REGISTRY` unset and the image is called `isolator:<version>`. `--a
 | Logs say `ERR_TLS_CERT_ALTNAME_INVALID` | The host name in `DATABASE_URL` doesn't match the database's certificate. |
 | Signing in works, then every page says it didn't load | `APP_URL` doesn't match the address in the browser exactly. |
 | The sign-in page shows no form | The `Content-Security-Policy` doesn't allow your Clerk host, or something else blocks Clerk. The browser console says which. |
+| The first page after a break takes several seconds, later ones are quick | `CLERK_JWT_KEY` isn't set, and the connection from the server to Clerk is slow. Set it. |
 | Someone signs in and has no Organization | They used a different address from the one they were invited with. |
 | Every upload fails with `The virus scanner isn't reachable` | `CLAMAV_HOST` is set, but ClamAV isn't running or is still starting. |
 | A file says `This file is stored in S3, but this install has no S3 settings` | `S3_BUCKET` was removed. Set it again. |
