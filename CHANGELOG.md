@@ -1,3 +1,9 @@
+# 1.2.0 (2026-11-05)
+## Features
+- __api,web:__ sort, search and page every register (50733d4)
+## Bug Fixes
+- __web:__ stop clipping the sign-in form's borders (62161fc)
+- __web:__ renew the Clerk session when the user is back, not on click (84c0ead)
 # 1.1.0 (2026-11-05)
 ## Features
 - __api,web:__ import and export the asset and Supplier registers as CSV (8dad28b)
