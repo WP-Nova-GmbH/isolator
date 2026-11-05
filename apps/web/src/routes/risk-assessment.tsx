@@ -1,15 +1,8 @@
 import { useLoaderData, type LoaderFunctionArgs } from 'react-router';
 import { PageHeader } from '@/components/page-header';
 import { RiskScore } from '@/components/risk-score';
-import { DataCell, MainCell, Ref } from '@/components/table-parts';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { columnHelper, DataTable } from '@/components/data-table';
+import { dataCell, mainCell, NoValue, Ref } from '@/components/table-parts';
 import { api } from '@/lib/api';
 import {
   residualScore,
@@ -22,15 +15,41 @@ export async function riskAssessmentLoader({ params }: LoaderFunctionArgs) {
   return api<CompletedRiskAssessment>(`/risk-assessments/${params.id}`);
 }
 
-function ResidualCell({ risk }: { risk: RegisterEntry }) {
-  const residual = residualScore(risk);
-  if (!residual) return <DataCell>Not set</DataCell>;
-  return (
-    <TableCell>
-      <RiskScore {...residual} />
-    </TableCell>
-  );
+const column = columnHelper<RegisterEntry>();
+
+function score(rating: { likelihood: number; impact: number } | null) {
+  return rating ? rating.likelihood * rating.impact : undefined;
 }
+
+const columns = column.columns([
+  column.accessor('ref', { header: 'ID', cell: ({ getValue }) => <Ref>{getValue()}</Ref> }),
+  column.accessor('title', { header: 'Risk', meta: { className: `${mainCell} font-medium` } }),
+  column.accessor((risk) => score(risk), {
+    id: 'before',
+    header: 'Before',
+    enableGlobalFilter: false,
+    cell: ({ row: { original: risk } }) => (
+      <RiskScore likelihood={risk.likelihood} impact={risk.impact} />
+    ),
+  }),
+  column.accessor((risk) => score(residualScore(risk)), {
+    id: 'after',
+    header: 'After',
+    enableGlobalFilter: false,
+    cell: ({ row }) => {
+      const residual = residualScore(row.original);
+      return residual ? <RiskScore {...residual} /> : <NoValue>Not set</NoValue>;
+    },
+  }),
+  column.accessor((risk) => (risk.treatment ? treatmentLabels[risk.treatment] : undefined), {
+    id: 'treatment',
+    header: 'Treatment',
+    cell: ({ getValue }) => getValue() ?? <NoValue>Not set</NoValue>,
+  }),
+  column.accessor('ownerName', { id: 'owner', header: 'Risk owner' }),
+  column.accessor('confirmedBy', { header: 'Confirmed by' }),
+  column.accessor('confirmedOn', { header: 'Confirmed on', meta: { className: dataCell } }),
+]);
 
 /** The register as a completed Risk assessment preserved it. Read-only. */
 export function RiskAssessment() {
@@ -43,42 +62,13 @@ export function RiskAssessment() {
         description={`Completed by ${assessment.completedBy} on ${assessment.completedOn}, with an acceptance threshold of ${assessment.acceptanceThreshold}.`}
         back={{ to: '/risks/assessments', label: 'Risk assessments' }}
       />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>ID</TableHead>
-            <TableHead>Risk</TableHead>
-            <TableHead>Before</TableHead>
-            <TableHead>After</TableHead>
-            <TableHead>Treatment</TableHead>
-            <TableHead>Risk owner</TableHead>
-            <TableHead>Confirmed by</TableHead>
-            <TableHead>Confirmed on</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {assessment.register.map((risk) => (
-            <TableRow key={risk.ref}>
-              <TableCell>
-                <Ref>{risk.ref}</Ref>
-              </TableCell>
-              <MainCell className="font-medium">{risk.title}</MainCell>
-              <TableCell>
-                <RiskScore likelihood={risk.likelihood} impact={risk.impact} />
-              </TableCell>
-              <ResidualCell risk={risk} />
-              {risk.treatment ? (
-                <TableCell>{treatmentLabels[risk.treatment]}</TableCell>
-              ) : (
-                <DataCell>Not set</DataCell>
-              )}
-              <TableCell>{risk.ownerName}</TableCell>
-              <TableCell>{risk.confirmedBy}</TableCell>
-              <DataCell>{risk.confirmedOn}</DataCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <DataTable
+        columns={columns}
+        data={assessment.register}
+        getRowId={(risk) => risk.ref}
+        searchLabel="Search risks"
+        emptyText="The register was empty when this Risk assessment was completed."
+      />
     </>
   );
 }

@@ -1,22 +1,15 @@
-import { useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Form } from 'react-router';
 import { Field } from '@/components/field';
 import { FormDialog, FormDialogBody, FormDialogFooter } from '@/components/form-dialog';
 import { FormError } from '@/components/form-error';
-import { OwnerSelect } from '@/components/owner-select';
+import { columnHelper, DataTable, sortByOrder } from '@/components/data-table';
+import { OwnerSelect, UNASSIGNED } from '@/components/owner-select';
 import { StateBadge } from '@/components/state-badge';
-import { DataCell, EmptyRow, MainCell, RecordLink, Ref } from '@/components/table-parts';
+import { dataCell, mainCell, NoValue, RecordLink, Ref } from '@/components/table-parts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { usePermissions } from '@/lib/members';
 import type { Task } from '@/lib/tasks';
 import { useFormFetcher } from '@/lib/use-form-fetcher';
@@ -31,6 +24,8 @@ interface TasksTableProps {
    */
   canFinish?: boolean;
   emptyText: string;
+  /** Controls beside the search that filter the Tasks, such as the Tasks page's TabNav. */
+  filters?: ReactNode;
 }
 
 /** Agrees who does a proposed Task and by when. */
@@ -133,66 +128,99 @@ function TaskActions({ task }: { task: Task }) {
   );
 }
 
+const column = columnHelper<Task>();
+
+/** From proposed to done, in the order a Task lives through them. */
+const taskStates = ['Proposed', 'Open', 'Overdue', 'Done', 'Cancelled'];
+
+const titleColumn = column.accessor('title', {
+  header: 'Task',
+  meta: { className: mainCell },
+  cell: ({ row: { original: task } }) => (
+    <>
+      {task.title}
+      {task.cancelledReason && (
+        <div className="text-xs text-muted-foreground">{task.cancelledReason}</div>
+      )}
+    </>
+  ),
+});
+
+const belongsToColumn = column.accessor(
+  (task) => (task.belongsTo ? `${task.belongsTo.ref} ${task.belongsTo.label}` : undefined),
+  {
+    id: 'belongsTo',
+    header: 'Belongs to',
+    meta: { className: mainCell },
+    cell: ({ row: { original: task } }) =>
+      task.belongsTo && (
+        <span className="flex items-baseline gap-2">
+          <Ref>{task.belongsTo.ref}</Ref>
+          <RecordLink to={task.belongsTo.to} className="font-normal">
+            {task.belongsTo.label}
+          </RecordLink>
+        </span>
+      ),
+  },
+);
+
+const otherColumns = column.columns([
+  column.accessor((task) => (task.owner === UNASSIGNED ? undefined : task.owner), {
+    id: 'owner',
+    header: 'Owner',
+    cell: ({ getValue }) => getValue() ?? <NoValue>{UNASSIGNED}</NoValue>,
+  }),
+  column.accessor((task) => task.dueOn ?? undefined, {
+    id: 'due',
+    header: 'Due',
+    meta: { className: dataCell },
+    cell: ({ row }) => row.original.due,
+  }),
+  column.accessor('state', {
+    header: 'State',
+    sortFn: sortByOrder(taskStates, (task) => task.state),
+    cell: ({ getValue }) => <StateBadge kind="task" state={getValue()} />,
+  }),
+]);
+
+const actionsColumn = column.display({
+  id: 'actions',
+  header: () => <span className="sr-only">Actions</span>,
+  meta: { className: 'py-0 text-right' },
+  cell: ({ row: { original: task } }) =>
+    (task.state === 'Proposed' || task.state === 'Open' || task.state === 'Overdue') && (
+      <TaskActions task={task} />
+    ),
+});
+
 export function TasksTable({
   tasks,
   showBelongsTo = false,
   canFinish: open = false,
   emptyText,
+  filters,
 }: TasksTableProps) {
   const canFinish = open && usePermissions().canEdit;
-  const columns = 4 + (showBelongsTo ? 1 : 0) + (canFinish ? 1 : 0);
+  const columns = useMemo(
+    () => [
+      titleColumn,
+      ...(showBelongsTo ? [belongsToColumn] : []),
+      ...otherColumns,
+      ...(canFinish ? [actionsColumn] : []),
+    ],
+    [showBelongsTo, canFinish],
+  );
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Task</TableHead>
-          {showBelongsTo && <TableHead>Belongs to</TableHead>}
-          <TableHead>Owner</TableHead>
-          <TableHead>Due</TableHead>
-          <TableHead>State</TableHead>
-          {canFinish && <TableHead className="sr-only">Actions</TableHead>}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {tasks.map((task) => (
-          <TableRow key={task.id ?? task.title}>
-            <MainCell>
-              {task.title}
-              {task.cancelledReason && (
-                <div className="text-xs text-muted-foreground">{task.cancelledReason}</div>
-              )}
-            </MainCell>
-            {showBelongsTo && (
-              <TableCell className="min-w-60 whitespace-normal">
-                {task.belongsTo && (
-                  <span className="flex items-baseline gap-2">
-                    <Ref>{task.belongsTo.ref}</Ref>
-                    <RecordLink to={task.belongsTo.to} className="font-normal">
-                      {task.belongsTo.label}
-                    </RecordLink>
-                  </span>
-                )}
-              </TableCell>
-            )}
-            <TableCell>{task.owner}</TableCell>
-            <DataCell>{task.due}</DataCell>
-            <TableCell>
-              <StateBadge kind="task" state={task.state} />
-            </TableCell>
-            {canFinish && (
-              <TableCell className="py-0 text-right">
-                {(task.state === 'Proposed' || task.state === 'Open' || task.state === 'Overdue') && (
-                  <TaskActions task={task} />
-                )}
-              </TableCell>
-            )}
-          </TableRow>
-        ))}
-        {tasks.length === 0 && (
-          <EmptyRow colSpan={columns}>{emptyText}</EmptyRow>
-        )}
-      </TableBody>
-    </Table>
+    <DataTable
+      columns={columns}
+      data={tasks}
+      getRowId={(task) => task.id ?? task.title}
+      filters={filters}
+      // On a record's page the Tasks share the URL with the record's other lists.
+      paramPrefix={showBelongsTo ? undefined : 'tasks-'}
+      searchLabel={showBelongsTo ? 'Search Tasks' : undefined}
+      emptyText={emptyText}
+    />
   );
 }

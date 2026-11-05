@@ -1,16 +1,9 @@
 import { Link, useLoaderData, type ActionFunctionArgs } from 'react-router';
 import { ImportButton } from '@/components/import-dialog';
 import { PageHeader } from '@/components/page-header';
-import { DataCell, EmptyRow, MainCell, RecordLink } from '@/components/table-parts';
+import { columnHelper, DataTable, sortByOrder } from '@/components/data-table';
+import { dataCell, mainCell, NoValue, noteCell, RecordLink } from '@/components/table-parts';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { UNASSIGNED, UNKNOWN } from '@/components/owner-select';
 import { api } from '@/lib/api';
 import { assetTypeLabels, classificationLabels, type Asset } from '@/lib/assets';
@@ -28,6 +21,79 @@ export async function assetsLoader() {
 export async function assetsAction({ request }: ActionFunctionArgs) {
   return importAction('/assets', await request.formData());
 }
+
+const column = columnHelper<Asset>();
+
+const columns = column.columns([
+  column.accessor('name', {
+    header: 'Asset',
+    meta: { className: mainCell },
+    cell: ({ row }) => (
+      <>
+        <RecordLink to={`/assets/${row.original.id}`}>{row.original.name}</RecordLink>
+        <AssetNote asset={row.original} />
+      </>
+    ),
+  }),
+  column.accessor((asset) => assetTypeLabels[asset.type], { id: 'type', header: 'Type' }),
+  column.accessor(
+    (asset) => (asset.classification ? classificationLabels[asset.classification] : undefined),
+    {
+      id: 'classification',
+      header: 'Classification',
+      sortFn: sortByOrder(Object.keys(classificationLabels), (asset) => asset.classification),
+      cell: ({ getValue }) => getValue() ?? <NoValue>{UNKNOWN}</NoValue>,
+    },
+  ),
+  column.accessor((asset) => asset.ownerName ?? undefined, {
+    id: 'owner',
+    header: 'Business owner',
+    cell: ({ getValue }) => getValue() ?? <NoValue>{UNASSIGNED}</NoValue>,
+  }),
+  column.accessor((asset) => asset.suppliers.map((supplier) => supplier.name).join(', ') || undefined, {
+    id: 'suppliers',
+    header: 'Suppliers',
+    cell: ({ row }) =>
+      row.original.suppliers.length > 0 ? (
+        row.original.suppliers.map((supplier, index) => (
+          <span key={supplier.ref}>
+            {index > 0 && ', '}
+            <RecordLink to={`/suppliers/${supplier.ref}`} className="font-normal">
+              {supplier.name}
+            </RecordLink>
+          </span>
+        ))
+      ) : (
+        <NoValue>None</NoValue>
+      ),
+  }),
+  column.accessor('risks', {
+    header: 'Open risks',
+    enableGlobalFilter: false,
+    meta: { className: dataCell },
+  }),
+]);
+
+const retiredColumns = column.columns([
+  column.accessor('name', {
+    header: 'Asset',
+    meta: { className: mainCell },
+    cell: ({ row: { original: asset } }) => (
+      <RecordLink to={`/assets/${asset.id}`}>{asset.name}</RecordLink>
+    ),
+  }),
+  column.accessor((asset) => asset.ownerName ?? undefined, {
+    id: 'owner',
+    header: 'Owner',
+    cell: ({ getValue }) => getValue() ?? <NoValue>{UNASSIGNED}</NoValue>,
+  }),
+  column.accessor((asset) => asset.retiredAt?.slice(0, 10), {
+    id: 'retired',
+    header: 'Retired',
+    meta: { className: dataCell },
+  }),
+  column.accessor('retiredReason', { header: 'Why', meta: { className: noteCell } }),
+]);
 
 /** What still has to happen before the record can be relied on. */
 function AssetNote({ asset }: { asset: Asset }) {
@@ -65,83 +131,24 @@ export function Assets() {
           )
         }
       />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Asset</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Classification</TableHead>
-            <TableHead>Business owner</TableHead>
-            <TableHead>Suppliers</TableHead>
-            <TableHead>Open risks</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {assets.map((asset) => (
-            <TableRow key={asset.id}>
-              <MainCell>
-                <RecordLink to={`/assets/${asset.id}`}>{asset.name}</RecordLink>
-                <AssetNote asset={asset} />
-              </MainCell>
-              <TableCell>{assetTypeLabels[asset.type]}</TableCell>
-              {asset.classification ? (
-                <TableCell>{classificationLabels[asset.classification]}</TableCell>
-              ) : (
-                <DataCell>{UNKNOWN}</DataCell>
-              )}
-              {asset.ownerName ? (
-                <TableCell>{asset.ownerName}</TableCell>
-              ) : (
-                <DataCell>{UNASSIGNED}</DataCell>
-              )}
-              {asset.suppliers.length > 0 ? (
-                <TableCell>
-                  {asset.suppliers.map((supplier, index) => (
-                    <span key={supplier.ref}>
-                      {index > 0 && ', '}
-                      <RecordLink to={`/suppliers/${supplier.ref}`} className="font-normal">
-                        {supplier.name}
-                      </RecordLink>
-                    </span>
-                  ))}
-                </TableCell>
-              ) : (
-                <DataCell>None</DataCell>
-              )}
-              <DataCell>{asset.risks}</DataCell>
-            </TableRow>
-          ))}
-          {assets.length === 0 && (
-            <EmptyRow colSpan={6}>No assets yet. Add the first one.</EmptyRow>
-          )}
-        </TableBody>
-      </Table>
+      <DataTable
+        columns={columns}
+        data={assets}
+        getRowId={(asset) => asset.id}
+        searchLabel="Search assets"
+        emptyText="No assets yet. Add the first one."
+      />
 
       {retired.length > 0 && (
         <section aria-label="Retired assets" className="flex flex-col gap-3">
           <h2>Retired assets</h2>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Asset</TableHead>
-                <TableHead>Owner</TableHead>
-                <TableHead>Retired</TableHead>
-                <TableHead>Why</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {retired.map((asset) => (
-                <TableRow key={asset.id}>
-                  <MainCell>
-                    <RecordLink to={`/assets/${asset.id}`}>{asset.name}</RecordLink>
-                  </MainCell>
-                  <TableCell>{asset.ownerName ?? UNASSIGNED}</TableCell>
-                  <DataCell>{asset.retiredAt?.slice(0, 10)}</DataCell>
-                  <DataCell className="min-w-40 whitespace-normal">{asset.retiredReason}</DataCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={retiredColumns}
+            data={retired}
+            getRowId={(asset) => asset.id}
+            paramPrefix="retired-"
+            emptyText="No retired assets."
+          />
         </section>
       )}
     </>

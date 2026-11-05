@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { XIcon } from 'lucide-react';
 import {
   Link,
@@ -28,21 +28,14 @@ import { RiskScore } from '@/components/risk-score';
 import { StateBadge } from '@/components/state-badge';
 import { SupplierFields } from '@/components/supplier-fields';
 import { TabNav } from '@/components/tab-nav';
-import { DataCell, EmptyRow, MainCell, Ref } from '@/components/table-parts';
+import { columnHelper, DataTable, sortByOrder } from '@/components/data-table';
+import { dataCell, mainCell, Ref } from '@/components/table-parts';
 import { TasksTable } from '@/components/tasks-table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { api, attempt } from '@/lib/api';
 import { historyItems } from '@/lib/audit';
@@ -59,6 +52,7 @@ import {
   supplierPayload,
   type SupplierDetail as Supplier,
   type SupplierFile,
+  type SupplierReview,
 } from '@/lib/suppliers';
 import { taskIntent, type Task } from '@/lib/tasks';
 import { useFormFetcher } from '@/lib/use-form-fetcher';
@@ -470,79 +464,96 @@ export function SupplierDetail() {
   );
 }
 
+const file = columnHelper<SupplierFile>();
+
+const fileColumns = file.columns([
+  file.accessor('title', {
+    header: 'File',
+    meta: { className: 'min-w-44 whitespace-normal' },
+    cell: ({ row: { original: item } }) => (
+      <>
+        <div className="font-medium">{item.title}</div>
+        <div className="text-xs text-muted-foreground">{fileKindLabels[item.kind]}</div>
+      </>
+    ),
+  }),
+  file.accessor((item) => item.location ?? item.upload?.name, {
+    id: 'location',
+    header: 'Where it is kept',
+    enableSorting: false,
+    meta: { className: `${dataCell} min-w-44 whitespace-normal` },
+    cell: ({ row }) => <FileLocation file={row.original} />,
+  }),
+  file.accessor((item) => item.datedOn ?? undefined, {
+    id: 'dated',
+    header: 'Dated',
+    meta: { className: dataCell },
+    cell: ({ getValue }) => getValue() ?? UNKNOWN,
+  }),
+  file.accessor((item) => item.expiresOn ?? undefined, {
+    id: 'expires',
+    header: 'Expires',
+    meta: { className: dataCell },
+    cell: ({ getValue }) => getValue() ?? 'None',
+  }),
+  file.accessor('state', {
+    header: 'State',
+    sortFn: sortByOrder(['Expired', 'Expires soon', 'Current'], (item) => item.state),
+    cell: ({ getValue }) => <StateBadge kind="evidence" state={getValue()} />,
+  }),
+]);
+
+const removeFileColumn = file.display({
+  id: 'actions',
+  header: () => <span className="sr-only">Actions</span>,
+  meta: { className: 'py-0' },
+  cell: ({ row }) => <RemoveFile file={row.original} />,
+});
+
 /** The index tab: contracts, certificates and other paperwork. */
 export function SupplierFiles() {
   const { supplier, locked } = useOutletContext<SupplierTabContext>();
+  const columns = useMemo(
+    () => (locked ? fileColumns : [...fileColumns, removeFileColumn]),
+    [locked],
+  );
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>File</TableHead>
-          <TableHead>Where it is kept</TableHead>
-          <TableHead>Dated</TableHead>
-          <TableHead>Expires</TableHead>
-          <TableHead>State</TableHead>
-          {!locked && <TableHead className="sr-only">Actions</TableHead>}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {supplier.files.map((file) => (
-          <TableRow key={file.id}>
-            <TableCell className="min-w-44 whitespace-normal">
-              <div className="font-medium">{file.title}</div>
-              <div className="text-xs text-muted-foreground">{fileKindLabels[file.kind]}</div>
-            </TableCell>
-            <DataCell className="min-w-44 whitespace-normal">
-              <FileLocation file={file} />
-            </DataCell>
-            <DataCell>{file.datedOn ?? UNKNOWN}</DataCell>
-            <DataCell>{file.expiresOn ?? 'None'}</DataCell>
-            <TableCell>
-              <StateBadge kind="evidence" state={file.state} />
-            </TableCell>
-            {!locked && (
-              <TableCell className="py-0">
-                <RemoveFile file={file} />
-              </TableCell>
-            )}
-          </TableRow>
-        ))}
-        {supplier.files.length === 0 && (
-          <EmptyRow colSpan={6}>No contracts or certificates on file yet.</EmptyRow>
-        )}
-      </TableBody>
-    </Table>
+    <DataTable
+      columns={columns}
+      data={supplier.files}
+      getRowId={(item) => item.id}
+      paramPrefix="files-"
+      emptyText="No contracts or certificates on file yet."
+    />
   );
 }
+
+const review = columnHelper<SupplierReview>();
+
+const reviewColumns = review.columns([
+  review.accessor('reviewedOn', { id: 'date', header: 'Date', meta: { className: dataCell } }),
+  review.accessor('reviewerName', { id: 'reviewer', header: 'Reviewed by' }),
+  review.accessor((item) => reviewOutcomeLabels[item.outcome], {
+    id: 'outcome',
+    header: 'Outcome',
+    sortFn: sortByOrder(Object.keys(reviewOutcomeLabels), (item) => item.outcome),
+    cell: ({ getValue }) => <StateBadge kind="supplierReview" state={getValue()} />,
+  }),
+  review.accessor('notes', { header: 'Notes', meta: { className: mainCell } }),
+]);
 
 export function SupplierReviews() {
   const { supplier } = useOutletContext<SupplierTabContext>();
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Date</TableHead>
-          <TableHead>Reviewed by</TableHead>
-          <TableHead>Outcome</TableHead>
-          <TableHead>Notes</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {supplier.reviews.map((review) => (
-          <TableRow key={review.id}>
-            <DataCell>{review.reviewedOn}</DataCell>
-            <TableCell>{review.reviewerName}</TableCell>
-            <TableCell>
-              <StateBadge kind="supplierReview" state={reviewOutcomeLabels[review.outcome]} />
-            </TableCell>
-            <MainCell>{review.notes}</MainCell>
-          </TableRow>
-        ))}
-        {supplier.reviews.length === 0 && <EmptyRow colSpan={4}>No reviews yet.</EmptyRow>}
-      </TableBody>
-    </Table>
+    <DataTable
+      columns={reviewColumns}
+      data={supplier.reviews}
+      getRowId={(item) => item.id}
+      paramPrefix="reviews-"
+      emptyText="No reviews yet."
+    />
   );
 }
 

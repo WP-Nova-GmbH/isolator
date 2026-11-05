@@ -6,6 +6,7 @@ import { createBrowserRouter, RouterProvider, type RouteObject } from 'react-rou
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { api, renewSessionOnReturn } from '@/lib/api';
 import { appLoader } from '@/lib/members';
+import { keepDataOnTableParams, loadOnTableParams } from '@/lib/table-params';
 import './index.css';
 import {
   AcceptInvite,
@@ -186,7 +187,13 @@ const routes: RouteObject[] = [
             element: <DocumentDetail />,
           },
           { path: 'audit-file', loader: auditFileLoader, element: <AuditFile /> },
-          { path: 'audit-trail', loader: auditTrailLoader, element: <AuditTrail /> },
+          {
+            path: 'audit-trail',
+            loader: auditTrailLoader,
+            // The server pages and searches the trail.
+            shouldRevalidate: loadOnTableParams,
+            element: <AuditTrail />,
+          },
           { path: 'members', loader: membersLoader, action: membersAction, element: <Members /> },
           { path: '*', element: <NotFound /> },
         ],
@@ -222,6 +229,18 @@ const routes: RouteObject[] = [
   },
 ];
 
+/** Searching, sorting or paging a list changes only the URL, so no route reloads its data. */
+function keepDataWhileBrowsingLists(routes: RouteObject[]): RouteObject[] {
+  return routes.map(
+    (route) =>
+      ({
+        shouldRevalidate: keepDataOnTableParams,
+        ...route,
+        ...(route.children && { children: keepDataWhileBrowsingLists(route.children) }),
+      }) as RouteObject,
+  );
+}
+
 async function start() {
   const root = createRoot(document.getElementById('root')!);
   const install = await api<{ clerkPublishableKey: string }>('/install', {
@@ -237,7 +256,7 @@ async function start() {
         appearance={{ theme: shadcn }}
       >
         <TooltipProvider>
-          <RouterProvider router={createBrowserRouter(routes)} />
+          <RouterProvider router={createBrowserRouter(keepDataWhileBrowsingLists(routes))} />
         </TooltipProvider>
       </ClerkProvider>
     </StrictMode>,

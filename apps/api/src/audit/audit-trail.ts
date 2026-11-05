@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, desc, eq, inArray } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, inArray, or } from 'drizzle-orm';
 import { DB, type Database } from '../db/db.module';
 import { auditEvents } from '../db/schema';
 import type { CurrentMember } from '../members/current-member';
@@ -122,24 +122,48 @@ export async function recordEvent(
   });
 }
 
+export interface TrailPage {
+  limit?: number;
+  offset?: number;
+  q?: string;
+}
+
 @Injectable()
 export class AuditTrailService {
   constructor(@Inject(DB) private readonly db: Database) {}
 
-  /** Newest first. Without a limit it returns the whole trail, for exporting. */
-  async list(organizationId: string, area?: string, limit?: number) {
+  /**
+   * Newest first, one page at a time. Without a limit it returns the whole trail, for exporting.
+   * The search matches who did it, the record's ref and name, and the reason given. `total`
+   * counts every event that matches, on every page.
+   */
+  async list(organizationId: string, area?: string, page: TrailPage = {}) {
     const types = area ? areas[area] : undefined;
+    const search = page.q?.trim();
+    // % and _ in what someone typed mean themselves, not wildcards.
+    const pattern = search && `%${search.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
     const filter = and(
       eq(auditEvents.organizationId, organizationId),
       types ? inArray(auditEvents.recordType, types) : undefined,
+      pattern
+        ? or(
+            ilike(auditEvents.memberName, pattern),
+            ilike(auditEvents.recordRef, pattern),
+            ilike(auditEvents.recordLabel, pattern),
+            ilike(auditEvents.reason, pattern),
+          )
+        : undefined,
     );
-    const query = this.db
+    let query = this.db
       .select()
       .from(auditEvents)
       .where(filter)
-      .orderBy(desc(auditEvents.sequence));
+      .orderBy(desc(auditEvents.sequence))
+      .$dynamic();
+    if (page.limit) query = query.limit(page.limit);
+    if (page.offset) query = query.offset(page.offset);
     const [events, [{ total }]] = await Promise.all([
-      limit ? query.limit(limit) : query,
+      query,
       this.db.select({ total: count() }).from(auditEvents).where(filter),
     ]);
     return { events, total };

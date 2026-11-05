@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Form,
   useActionData,
@@ -16,18 +16,11 @@ import {
 import { FormError } from '@/components/form-error';
 import { InvitationDialog } from '@/components/invitation-dialog';
 import { PageHeader, SectionHeader } from '@/components/page-header';
-import { DataCell, EmptyRow, MainCell } from '@/components/table-parts';
+import { columnHelper, DataTable, sortByOrder } from '@/components/data-table';
+import { dataCell, mainCell } from '@/components/table-parts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { api, attempt, refused } from '@/lib/api';
 import { invitationLink } from '@/lib/auth';
@@ -164,10 +157,79 @@ function MemberActions({ member }: { member: Member }) {
   );
 }
 
+const member = columnHelper<Member>();
+
+const memberColumns = member.columns([
+  member.accessor('name', { header: 'Name', meta: { className: `${mainCell} font-medium` } }),
+  member.accessor('email', { header: 'Email', meta: { className: dataCell } }),
+  member.accessor((row) => roleLabels[row.role], {
+    id: 'role',
+    header: 'Role',
+    sortFn: sortByOrder(Object.keys(roleLabels), (row) => row.role),
+  }),
+  member.accessor('risksOwned', {
+    header: 'Risks owned',
+    enableGlobalFilter: false,
+    meta: { className: dataCell },
+  }),
+  member.accessor((row) => row.joinedAt.slice(0, 10), {
+    id: 'joined',
+    header: 'Joined',
+    meta: { className: dataCell },
+  }),
+]);
+
+const memberActions = member.display({
+  id: 'actions',
+  header: () => <span className="sr-only">Actions</span>,
+  meta: { className: 'py-0 text-right' },
+  cell: ({ row }) => <MemberActions member={row.original} />,
+});
+
+const invitation = columnHelper<Invitation>();
+
+const invitationColumns = invitation.columns([
+  invitation.accessor('email', { header: 'Email', meta: { className: mainCell } }),
+  invitation.accessor((row) => roleLabels[row.role], {
+    id: 'role',
+    header: 'Role',
+    sortFn: sortByOrder(Object.keys(roleLabels), (row) => row.role),
+  }),
+  invitation.accessor('invitedBy', { header: 'Invited by' }),
+  invitation.accessor((row) => row.expiresAt.slice(0, 10), {
+    id: 'expires',
+    header: 'Expires',
+    meta: { className: dataCell },
+  }),
+]);
+
+const invitationActions = invitation.display({
+  id: 'actions',
+  header: () => <span className="sr-only">Actions</span>,
+  meta: { className: 'py-0 text-right' },
+  cell: ({ row }) => (
+    <Form method="post">
+      <input type="hidden" name="id" value={row.original.id} />
+      <Button type="submit" name="intent" value="revoke" variant="ghost" size="xs">
+        Revoke
+      </Button>
+    </Form>
+  ),
+});
+
 export function Members() {
   const { me, members } = useAppData();
   const { canAdminister } = usePermissions();
   const invitations = useLoaderData<typeof membersLoader>();
+  // Only an Administrator gets the buttons, so the columns depend on the role.
+  const memberColumnsFor = useMemo(
+    () => (canAdminister ? [...memberColumns, memberActions] : memberColumns),
+    [canAdminister],
+  );
+  const invitationColumnsFor = useMemo(
+    () => (canAdminister ? [...invitationColumns, invitationActions] : invitationColumns),
+    [canAdminister],
+  );
   const result = useActionData<typeof membersAction>();
   const [inviting, setInviting] = useState(false);
 
@@ -206,34 +268,13 @@ export function Members() {
 
       <section className="flex flex-col gap-3">
         <h2>Members</h2>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Risks owned</TableHead>
-              <TableHead>Joined</TableHead>
-              {canAdminister && <TableHead className="sr-only">Actions</TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {members.map((member) => (
-              <TableRow key={member.id}>
-                <MainCell className="font-medium">{member.name}</MainCell>
-                <DataCell>{member.email}</DataCell>
-                <TableCell>{roleLabels[member.role]}</TableCell>
-                <DataCell>{member.risksOwned}</DataCell>
-                <DataCell>{member.joinedAt.slice(0, 10)}</DataCell>
-                {canAdminister && (
-                  <TableCell className="py-0 text-right">
-                    <MemberActions member={member} />
-                  </TableCell>
-                )}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={memberColumnsFor}
+          data={members}
+          getRowId={(member) => member.id}
+          searchLabel="Search Members"
+          emptyText="No Members yet."
+        />
       </section>
 
       <section aria-label="Roles" className="flex flex-col gap-3">
@@ -250,40 +291,13 @@ export function Members() {
 
       <section className="flex flex-col gap-3">
         <h2>Open invitations</h2>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Invited by</TableHead>
-              <TableHead>Expires</TableHead>
-              {canAdminister && <TableHead className="sr-only">Actions</TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {invitations.map((invitation) => (
-              <TableRow key={invitation.id}>
-                <MainCell>{invitation.email}</MainCell>
-                <TableCell>{roleLabels[invitation.role]}</TableCell>
-                <TableCell>{invitation.invitedBy}</TableCell>
-                <DataCell>{invitation.expiresAt.slice(0, 10)}</DataCell>
-                {canAdminister && (
-                  <TableCell className="py-0 text-right">
-                    <Form method="post">
-                      <input type="hidden" name="id" value={invitation.id} />
-                      <Button type="submit" name="intent" value="revoke" variant="ghost" size="xs">
-                        Revoke
-                      </Button>
-                    </Form>
-                  </TableCell>
-                )}
-              </TableRow>
-            ))}
-            {invitations.length === 0 && (
-              <EmptyRow colSpan={canAdminister ? 5 : 4}>No open invitations.</EmptyRow>
-            )}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={invitationColumnsFor}
+          data={invitations}
+          getRowId={(invitation) => invitation.id}
+          paramPrefix="invitations-"
+          emptyText="No open invitations."
+        />
       </section>
 
       <section aria-label="Organization settings" className="flex flex-col gap-4">

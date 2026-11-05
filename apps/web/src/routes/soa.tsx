@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useLoaderData, type ActionFunctionArgs } from 'react-router';
 import { Field } from '@/components/field';
 import { FormDialog, FormDialogBody, FormDialogFooter } from '@/components/form-dialog';
@@ -7,20 +7,13 @@ import { PageHeader } from '@/components/page-header';
 import { StatGrid, StatTile } from '@/components/stat-tile';
 import { StateBadge } from '@/components/state-badge';
 import { TabNav, useTabFilter } from '@/components/tab-nav';
-import { DataCell, EmptyRow, MainCell, RecordLink, Ref } from '@/components/table-parts';
+import { columnHelper, DataTable, sortByOrder } from '@/components/data-table';
+import { dataCell, mainCell, NoValue, RecordLink, Ref } from '@/components/table-parts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { api, attempt } from '@/lib/api';
 import { usePermissions } from '@/lib/members';
-import { controlState, type SoaEntry } from '@/lib/soa';
+import { controlState, statusLabels, type SoaEntry } from '@/lib/soa';
 import { useFormFetcher } from '@/lib/use-form-fetcher';
 
 const tabs = [
@@ -41,21 +34,57 @@ export async function soaAction({ request }: ActionFunctionArgs) {
   return attempt(() => api('/soa', { method: 'POST', body: { title: form.get('title') } }));
 }
 
-function EvidenceCell({ entry }: { entry: SoaEntry }) {
-  if (entry.expiredEvidence > 0) {
-    return (
-      <TableCell>
-        <StateBadge kind="evidence" state="Expired" label={`${entry.expiredEvidence} expired`} />
-      </TableCell>
-    );
-  }
-  return <DataCell>{entry.evidenceCount}</DataCell>;
-}
-
 function secondLine(entry: SoaEntry) {
   if (entry.own) return 'Own control';
   return entry.applicable ? null : entry.justification;
 }
+
+const column = columnHelper<SoaEntry>();
+
+const columns = column.columns([
+  column.accessor('ref', { header: 'Ref', cell: ({ getValue }) => <Ref>{getValue()}</Ref> }),
+  column.accessor('title', {
+    header: 'Control',
+    meta: { className: mainCell },
+    cell: ({ row: { original: entry } }) => (
+      <>
+        <RecordLink to={`/soa/${entry.ref}`}>{entry.title}</RecordLink>
+        {secondLine(entry) && (
+          <div className="text-xs text-muted-foreground">{secondLine(entry)}</div>
+        )}
+      </>
+    ),
+  }),
+  column.accessor((entry) => (entry.applicable ? 'Yes' : 'No'), { id: 'applies', header: 'Applies' }),
+  column.accessor((entry) => controlState(entry), {
+    id: 'status',
+    header: 'Status',
+    // From not started to implemented, with excluded controls last.
+    sortFn: sortByOrder<SoaEntry>([...Object.values(statusLabels), 'Not applicable'], controlState),
+    cell: ({ getValue }) => <StateBadge kind="control" state={getValue()} />,
+  }),
+  column.accessor((entry) => entry.ownerName ?? undefined, {
+    id: 'owner',
+    header: 'Owner',
+    cell: ({ getValue }) => getValue() ?? <NoValue>None</NoValue>,
+  }),
+  column.accessor('evidenceCount', {
+    id: 'evidence',
+    header: 'Evidence',
+    enableGlobalFilter: false,
+    cell: ({ row: { original: entry } }) =>
+      entry.expiredEvidence > 0 ? (
+        <StateBadge kind="evidence" state="Expired" label={`${entry.expiredEvidence} expired`} />
+      ) : (
+        <span className={dataCell}>{entry.evidenceCount}</span>
+      ),
+  }),
+  column.accessor((entry) => (entry.confirmation ? 'Confirmed' : 'Draft'), {
+    id: 'confirmation',
+    header: 'Confirmation',
+    cell: ({ getValue }) => <StateBadge kind="confirmation" state={getValue()} />,
+  }),
+]);
 
 function OwnControlForm({ onClose }: { onClose: () => void }) {
   const fetcher = useFormFetcher(onClose);
@@ -84,7 +113,10 @@ export function Soa() {
   const all = useLoaderData<typeof soaLoader>();
   const { value, items } = useTabFilter(tabs);
   const [adding, setAdding] = useState(false);
-  const entries = value === 'all' ? all : all.filter((entry) => entry.theme === value);
+  const entries = useMemo(
+    () => (value === 'all' ? all : all.filter((entry) => entry.theme === value)),
+    [all, value],
+  );
 
   return (
     <>
@@ -117,53 +149,14 @@ export function Soa() {
         />
       </StatGrid>
 
-      <TabNav label="Control themes" items={items} />
-
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Ref</TableHead>
-            <TableHead>Control</TableHead>
-            <TableHead>Applies</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Owner</TableHead>
-            <TableHead>Evidence</TableHead>
-            <TableHead>Confirmation</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {entries.map((entry) => (
-            <TableRow key={entry.ref}>
-              <TableCell>
-                <Ref>{entry.ref}</Ref>
-              </TableCell>
-              <MainCell>
-                <RecordLink to={`/soa/${entry.ref}`}>{entry.title}</RecordLink>
-                {secondLine(entry) && (
-                  <div className="text-xs text-muted-foreground">{secondLine(entry)}</div>
-                )}
-              </MainCell>
-              <TableCell>{entry.applicable ? 'Yes' : 'No'}</TableCell>
-              <TableCell>
-                <StateBadge kind="control" state={controlState(entry)} />
-              </TableCell>
-              {entry.ownerName ? (
-                <TableCell>{entry.ownerName}</TableCell>
-              ) : (
-                <DataCell>None</DataCell>
-              )}
-              <EvidenceCell entry={entry} />
-              <TableCell>
-                <StateBadge
-                  kind="confirmation"
-                  state={entry.confirmation ? 'Confirmed' : 'Draft'}
-                />
-              </TableCell>
-            </TableRow>
-          ))}
-          {entries.length === 0 && <EmptyRow colSpan={7}>No entries here.</EmptyRow>}
-        </TableBody>
-      </Table>
+      <DataTable
+        columns={columns}
+        data={entries}
+        getRowId={(entry) => entry.ref}
+        filters={<TabNav label="Control themes" items={items} />}
+        searchLabel="Search controls"
+        emptyText="No entries here."
+      />
     </>
   );
 }

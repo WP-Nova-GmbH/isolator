@@ -4,9 +4,13 @@ import { ClerkFailed, SignIn } from '@clerk/react';
 const embedded = {
   elements: {
     rootBox: { width: '100%' },
-    cardBox: { width: '100%', border: 'none', boxShadow: 'none' },
-    card: { padding: 0, border: 'none', boxShadow: 'none', background: 'transparent' },
-    header: { display: 'none' },
+    // Clerk clips the card box and pulls the card 1px over its edge. Without the card's padding
+    // that clips the fields' borders and focus rings, so neither may stay.
+    cardBox: { width: '100%', border: 'none', boxShadow: 'none', overflow: 'visible' },
+    card: { padding: 0, margin: 0, border: 'none', boxShadow: 'none', background: 'transparent' },
+    // The first step's header repeats the page heading. Later ones say where the code went.
+    header: { '.cl-signIn-start &': { display: 'none' } },
+    logoBox: { display: 'none' },
     footer: { background: 'transparent' },
   },
 };

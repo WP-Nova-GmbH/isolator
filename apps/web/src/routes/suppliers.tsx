@@ -2,16 +2,19 @@ import { Link, useLoaderData, type ActionFunctionArgs } from 'react-router';
 import { ImportButton } from '@/components/import-dialog';
 import { PageHeader } from '@/components/page-header';
 import { StateBadge } from '@/components/state-badge';
-import { DataCell, EmptyRow, MainCell, RecordLink, Ref } from '@/components/table-parts';
-import { Button } from '@/components/ui/button';
+import { columnHelper, DataTable, sortByOrder } from '@/components/data-table';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  DataCell,
+  dataCell,
+  EmptyRow,
+  mainCell,
+  NoValue,
+  noteCell,
+  RecordLink,
+  Ref,
+} from '@/components/table-parts';
+import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { api } from '@/lib/api';
 import { importAction } from '@/lib/imports';
 import { useAppData, usePermissions } from '@/lib/members';
@@ -29,6 +32,82 @@ export async function suppliersLoader() {
 export async function suppliersAction({ request }: ActionFunctionArgs) {
   return importAction('/suppliers', await request.formData());
 }
+
+const column = columnHelper<Supplier>();
+
+const columns = column.columns([
+  column.accessor('ref', { header: 'ID', cell: ({ getValue }) => <Ref>{getValue()}</Ref> }),
+  column.accessor('name', {
+    header: 'Supplier',
+    meta: { className: mainCell },
+    cell: ({ row: { original: supplier } }) => (
+      <>
+        <RecordLink to={`/suppliers/${supplier.ref}`}>{supplier.name}</RecordLink>
+        {supplier.provides && (
+          <div className="line-clamp-1 text-xs text-muted-foreground" title={supplier.provides}>
+            {supplier.provides}
+          </div>
+        )}
+      </>
+    ),
+  }),
+  column.accessor(
+    (supplier) => (supplier.criticality ? criticalityLabels[supplier.criticality] : undefined),
+    {
+      id: 'criticality',
+      header: 'Criticality',
+      sortFn: sortByOrder(Object.keys(criticalityLabels), (supplier) => supplier.criticality),
+      cell: ({ getValue }) => getValue() ?? <NoValue>{UNKNOWN}</NoValue>,
+    },
+  ),
+  column.accessor('assetCount', {
+    header: 'Assets',
+    enableGlobalFilter: false,
+    meta: { className: dataCell },
+  }),
+  // Sorts by the date; a rolling contract comes after every end date.
+  column.accessor(
+    (supplier) =>
+      supplier.contractTerm === 'fixed'
+        ? (supplier.contractEnds ?? undefined)
+        : supplier.contractTerm === 'rolling'
+          ? 'Rolling'
+          : undefined,
+    {
+      id: 'contractEnds',
+      header: 'Contract ends',
+      meta: { className: dataCell },
+      cell: ({ row }) => contractEndLabel(row.original),
+    },
+  ),
+  column.accessor('nextReviewOn', { header: 'Next review', meta: { className: dataCell } }),
+  column.accessor((supplier) => supplier.ownerName ?? undefined, {
+    id: 'owner',
+    header: 'Owner',
+    cell: ({ getValue }) => getValue() ?? <NoValue>{UNASSIGNED}</NoValue>,
+  }),
+  column.accessor('state', {
+    header: 'State',
+    cell: ({ getValue }) => <StateBadge kind="supplier" state={getValue()} />,
+  }),
+]);
+
+const endedColumns = column.columns([
+  column.accessor('ref', { header: 'ID', cell: ({ getValue }) => <Ref>{getValue()}</Ref> }),
+  column.accessor('name', {
+    header: 'Supplier',
+    meta: { className: mainCell },
+    cell: ({ row: { original: supplier } }) => (
+      <RecordLink to={`/suppliers/${supplier.ref}`}>{supplier.name}</RecordLink>
+    ),
+  }),
+  column.accessor((supplier) => supplier.endedAt?.slice(0, 10), {
+    id: 'ended',
+    header: 'Ended',
+    meta: { className: dataCell },
+  }),
+  column.accessor('endedReason', { header: 'Why', meta: { className: noteCell } }),
+]);
 
 export function Suppliers() {
   const { canEdit } = usePermissions();
@@ -81,85 +160,25 @@ export function Suppliers() {
 
       <section aria-label="Supplier register" className="flex flex-col gap-3">
         <h2>Register</h2>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>Supplier</TableHead>
-              <TableHead>Criticality</TableHead>
-              <TableHead>Assets</TableHead>
-              <TableHead>Contract ends</TableHead>
-              <TableHead>Next review</TableHead>
-              <TableHead>Owner</TableHead>
-              <TableHead>State</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {suppliers.map((supplier) => (
-              <TableRow key={supplier.ref}>
-                <TableCell>
-                  <Ref>{supplier.ref}</Ref>
-                </TableCell>
-                <MainCell>
-                  <RecordLink to={`/suppliers/${supplier.ref}`}>{supplier.name}</RecordLink>
-                  {supplier.provides && (
-                    <div className="line-clamp-1 text-xs text-muted-foreground" title={supplier.provides}>
-                      {supplier.provides}
-                    </div>
-                  )}
-                </MainCell>
-                {supplier.criticality ? (
-                  <TableCell>{criticalityLabels[supplier.criticality]}</TableCell>
-                ) : (
-                  <DataCell>{UNKNOWN}</DataCell>
-                )}
-                <DataCell>{supplier.assetCount}</DataCell>
-                <DataCell>{contractEndLabel(supplier)}</DataCell>
-                <DataCell>{supplier.nextReviewOn}</DataCell>
-                {supplier.ownerName ? (
-                  <TableCell>{supplier.ownerName}</TableCell>
-                ) : (
-                  <DataCell>{UNASSIGNED}</DataCell>
-                )}
-                <TableCell>
-                  <StateBadge kind="supplier" state={supplier.state} />
-                </TableCell>
-              </TableRow>
-            ))}
-            {suppliers.length === 0 && (
-              <EmptyRow colSpan={8}>No Suppliers yet. Add the first one.</EmptyRow>
-            )}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={columns}
+          data={suppliers}
+          getRowId={(supplier) => supplier.ref}
+          searchLabel="Search Suppliers"
+          emptyText="No Suppliers yet. Add the first one."
+        />
       </section>
 
       {ended.length > 0 && (
         <section aria-label="Ended Suppliers" className="flex flex-col gap-3">
           <h2>Ended Suppliers</h2>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Supplier</TableHead>
-                <TableHead>Ended</TableHead>
-                <TableHead>Why</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {ended.map((supplier) => (
-                <TableRow key={supplier.ref}>
-                  <TableCell>
-                    <Ref>{supplier.ref}</Ref>
-                  </TableCell>
-                  <MainCell>
-                    <RecordLink to={`/suppliers/${supplier.ref}`}>{supplier.name}</RecordLink>
-                  </MainCell>
-                  <DataCell>{supplier.endedAt?.slice(0, 10)}</DataCell>
-                  <DataCell className="min-w-40 whitespace-normal">{supplier.endedReason}</DataCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <DataTable
+            columns={endedColumns}
+            data={ended}
+            getRowId={(supplier) => supplier.ref}
+            paramPrefix="ended-"
+            emptyText="No ended Suppliers."
+          />
         </section>
       )}
     </>

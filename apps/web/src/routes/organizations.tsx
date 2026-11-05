@@ -12,18 +12,11 @@ import { FormError } from '@/components/form-error';
 import { InvitationDialog } from '@/components/invitation-dialog';
 import { Logo } from '@/components/logo';
 import { PageHeader } from '@/components/page-header';
-import { DataCell, EmptyRow, MainCell } from '@/components/table-parts';
+import { columnHelper, DataTable } from '@/components/data-table';
+import { dataCell, mainCell } from '@/components/table-parts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { api, refused } from '@/lib/api';
 import { invitationLink } from '@/lib/auth';
 
@@ -129,6 +122,41 @@ function OperatorActions({ organizations }: { organizations: Organization[] }) {
   );
 }
 
+const column = columnHelper<Organization>();
+
+const columns = column.columns([
+  column.accessor('name', {
+    header: 'Organization',
+    meta: { className: `${mainCell} font-medium` },
+  }),
+  column.accessor('members', {
+    header: 'Members',
+    enableGlobalFilter: false,
+    meta: { className: dataCell },
+  }),
+  column.accessor((organization) => organization.createdAt.slice(0, 10), {
+    id: 'created',
+    header: 'Created',
+    meta: { className: dataCell },
+  }),
+  column.display({
+    id: 'open',
+    header: () => <span className="sr-only">Open</span>,
+    meta: { className: 'py-0 text-right' },
+    cell: ({ row: { original: organization } }) =>
+      organization.isMember ? (
+        <Form method="post">
+          <input type="hidden" name="id" value={organization.id} />
+          <Button type="submit" name="intent" value="open" variant="ghost" size="xs">
+            Open
+          </Button>
+        </Form>
+      ) : (
+        <span className="text-xs text-muted-foreground">Not a Member</span>
+      ),
+  }),
+]);
+
 export function Organizations() {
   const { me, organizations } = useLoaderData<typeof organizationsLoader>();
   const result = useActionData<typeof organizationsAction>();
@@ -153,44 +181,17 @@ export function Organizations() {
         />
         <FormError message={result && 'error' in result ? result.error : undefined} />
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Organization</TableHead>
-              <TableHead>Members</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="sr-only">Open</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {organizations.map((organization) => (
-              <TableRow key={organization.id}>
-                <MainCell className="font-medium">{organization.name}</MainCell>
-                <DataCell>{organization.members}</DataCell>
-                <DataCell>{organization.createdAt.slice(0, 10)}</DataCell>
-                <TableCell className="py-0 text-right">
-                  {organization.isMember ? (
-                    <Form method="post">
-                      <input type="hidden" name="id" value={organization.id} />
-                      <Button type="submit" name="intent" value="open" variant="ghost" size="xs">
-                        Open
-                      </Button>
-                    </Form>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">Not a Member</span>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-            {organizations.length === 0 && (
-              <EmptyRow colSpan={4}>
-                {me.isOperator
-                  ? 'No Organizations yet. Create the first one.'
-                  : 'You aren’t in an Organization yet. Ask for an invitation link.'}
-              </EmptyRow>
-            )}
-          </TableBody>
-        </Table>
+        <DataTable
+          columns={columns}
+          data={organizations}
+          getRowId={(organization) => organization.id}
+          searchLabel="Search Organizations"
+          emptyText={
+            me.isOperator
+              ? 'No Organizations yet. Create the first one.'
+              : 'You aren’t in an Organization yet. Ask for an invitation link.'
+          }
+        />
       </main>
     </div>
   );

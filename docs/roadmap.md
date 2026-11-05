@@ -45,7 +45,7 @@ Isolator has to carry an ISMS from nothing to a certificate and beyond. The phas
 
 ## Later
 
-- [ ] Scan framework: background workers, findings → risks/evidence
+- [ ] Scan framework: background workers, findings → risks/evidence (principles in [scans.md](scans.md))
 - [ ] First integrations: Microsoft 365 / Entra ID, Google Workspace, AWS, external attack surface
 - [ ] AI-drafted proposals for recurring risk assessments
 - [ ] Import of an existing SoA and risk register. Imported ratings, treatments and applicability are decisions, so each needs a Confirmation before it counts

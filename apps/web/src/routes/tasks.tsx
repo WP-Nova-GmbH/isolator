@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useActionData, useLoaderData, type ActionFunctionArgs } from 'react-router';
 import { FormError } from '@/components/form-error';
 import { NewTaskForm } from '@/components/new-task-form';
@@ -51,14 +51,17 @@ export function Tasks() {
   const { value, items } = useTabFilter(tabs);
   const [adding, setAdding] = useState(false);
 
-  const filters: Record<string, (task: ApiTask) => boolean> = {
-    mine: (task) => task.ownerId === me.id,
-    proposed: (task) => task.state === 'Proposed',
-    overdue: (task) => task.state === 'Overdue',
-    done: (task) => task.state === 'Done',
-    cancelled: (task) => task.state === 'Cancelled',
-  };
-  const filter = filters[value];
+  const rows = useMemo(() => {
+    const filters: Record<string, (task: ApiTask) => boolean> = {
+      mine: (task) => task.ownerId === me.id,
+      proposed: (task) => task.state === 'Proposed',
+      overdue: (task) => task.state === 'Overdue',
+      done: (task) => task.state === 'Done',
+      cancelled: (task) => task.state === 'Cancelled',
+    };
+    const filter = filters[value];
+    return (filter ? tasks.filter(filter) : tasks).map(toTask);
+  }, [tasks, value, me.id]);
   const targets = [
     {
       group: 'Risks',
@@ -112,11 +115,11 @@ export function Tasks() {
       />
       <FormError message={result?.error} />
       {adding && <NewTaskForm targets={targets} onClose={() => setAdding(false)} />}
-      <TabNav label="Task filter" items={items} />
       <TasksTable
-        tasks={(filter ? tasks.filter(filter) : tasks).map(toTask)}
+        tasks={rows}
         showBelongsTo
         canFinish
+        filters={<TabNav label="Task filter" items={items} />}
         emptyText="No Tasks here."
       />
     </>

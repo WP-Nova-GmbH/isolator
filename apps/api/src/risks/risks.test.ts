@@ -465,9 +465,42 @@ describe('Audit trail', () => {
       riskRef: ref,
     });
     expect((await trail.list(org.id, 'tasks')).events.map((e) => e.action)).toEqual(['task.added']);
-    const limited = await trail.list(org.id, undefined, 1);
+    const limited = await trail.list(org.id, undefined, { limit: 1 });
     expect(limited.events).toHaveLength(1);
     expect(limited.total).toBe(2);
+  });
+
+  it('pages from the newest event', async () => {
+    const org = await organization();
+    const { ref } = await risks.create(org.owner, input(org.owner.id));
+    await risks.update(org.owner, ref, input(org.owner.id, { title: 'Renamed' }));
+    await risks.confirm(org.owner, ref);
+    const second = await trail.list(org.id, undefined, { limit: 1, offset: 1 });
+    expect(second.events.map((event) => event.action)).toEqual(['risk.changed']);
+    expect(second.total).toBe(3);
+    const past = await trail.list(org.id, undefined, { limit: 1, offset: 3 });
+    expect(past.events).toEqual([]);
+  });
+
+  it('searches who did it, the record and the reason', async () => {
+    const org = await organization();
+    const { ref } = await risks.create(org.owner, input(org.owner.id));
+    await risks.linkAsset(org.colleague, ref, org.asset.id);
+    await risks.close(org.owner, ref, 'Laptops are encrypted now');
+    const actions = async (q: string) =>
+      (await trail.list(org.id, undefined, { q })).events.map((event) => event.action);
+
+    expect(await actions('colleague')).toEqual(['risk.asset_linked']);
+    expect(await actions(ref.toLowerCase())).toHaveLength(3);
+    expect(await actions('ENCRYPTED')).toEqual(['risk.closed']);
+    expect((await trail.list(org.id, undefined, { q: 'colleague', limit: 1 })).total).toBe(1);
+  });
+
+  it('takes % and _ in a search literally', async () => {
+    const org = await organization();
+    await risks.create(org.owner, input(org.owner.id));
+    expect((await trail.list(org.id, undefined, { q: '%' })).events).toEqual([]);
+    expect((await trail.list(org.id, undefined, { q: '_' })).events).toEqual([]);
   });
 
   it('keeps names as they were at the time', async () => {

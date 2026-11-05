@@ -1,18 +1,12 @@
 import { XIcon } from 'lucide-react';
+import { useMemo } from 'react';
 import { Link, useFetcher } from 'react-router';
+import { columnHelper, DataTable, sortByOrder } from '@/components/data-table';
 import { DownloadButton } from '@/components/download-button';
 import { UNKNOWN } from '@/components/owner-select';
 import { StateBadge } from '@/components/state-badge';
-import { DataCell, EmptyRow, MainCell, Ref } from '@/components/table-parts';
+import { dataCell, mainCell, Ref } from '@/components/table-parts';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { usePermissions } from '@/lib/members';
 import type { EvidenceItem } from '@/lib/soa';
 
@@ -54,6 +48,54 @@ function EvidenceTitle({ item }: { item: EvidenceItem }) {
   );
 }
 
+const column = columnHelper<EvidenceItem>();
+
+const refColumn = column.accessor('ref', {
+  header: 'Ref',
+  cell: ({ getValue }) => (
+    <Link to={`/soa/${getValue()}`} className="hover:underline">
+      <Ref>{getValue()}</Ref>
+    </Link>
+  ),
+});
+
+const titleColumn = column.accessor('title', {
+  header: 'Evidence',
+  meta: { className: mainCell },
+  cell: ({ row }) => <EvidenceTitle item={row.original} />,
+});
+
+const detailColumns = column.columns([
+  column.accessor('kind', { header: 'Kind' }),
+  column.accessor((item) => item.datedOn ?? undefined, {
+    id: 'dated',
+    header: 'Dated',
+    meta: { className: dataCell },
+    cell: ({ getValue }) => getValue() ?? UNKNOWN,
+  }),
+  column.accessor((item) => item.expiresOn ?? undefined, {
+    id: 'expires',
+    header: 'Expires',
+    meta: { className: dataCell },
+    cell: ({ getValue }) => getValue() ?? 'None',
+  }),
+]);
+
+const addedByColumn = column.accessor('addedBy', { header: 'Added by' });
+
+const stateColumn = column.accessor('state', {
+  header: 'State',
+  sortFn: sortByOrder(['Expired', 'Expires soon', 'Current'], (item) => item.state),
+  cell: ({ getValue }) => <StateBadge kind="evidence" state={getValue()} />,
+});
+
+const actionsColumn = column.display({
+  id: 'actions',
+  header: () => <span className="sr-only">Actions</span>,
+  meta: { className: 'py-0' },
+  cell: ({ row }) => <RemoveEvidence item={row.original} />,
+});
+
 interface EvidenceTableProps {
   items: EvidenceItem[];
   /** Shows which control each belongs to, on the page that lists all of them. */
@@ -63,51 +105,27 @@ interface EvidenceTableProps {
 /** Posts intent=remove-evidence to the page's action. */
 export function EvidenceTable({ items, showControl = false }: EvidenceTableProps) {
   const { canEdit } = usePermissions();
+  const columns = useMemo(
+    () => [
+      ...(showControl ? [refColumn] : []),
+      titleColumn,
+      ...detailColumns,
+      ...(showControl ? [addedByColumn] : []),
+      stateColumn,
+      ...(canEdit ? [actionsColumn] : []),
+    ],
+    [showControl, canEdit],
+  );
+
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          {showControl && <TableHead>Ref</TableHead>}
-          <TableHead>Evidence</TableHead>
-          <TableHead>Kind</TableHead>
-          <TableHead>Dated</TableHead>
-          <TableHead>Expires</TableHead>
-          {showControl && <TableHead>Added by</TableHead>}
-          <TableHead>State</TableHead>
-          {canEdit && <TableHead className="sr-only">Actions</TableHead>}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {items.map((item) => (
-          <TableRow key={item.id}>
-            {showControl && (
-              <TableCell>
-                <Link to={`/soa/${item.ref}`} className="hover:underline">
-                  <Ref>{item.ref}</Ref>
-                </Link>
-              </TableCell>
-            )}
-            <MainCell>
-              <EvidenceTitle item={item} />
-            </MainCell>
-            <TableCell>{item.kind}</TableCell>
-            <DataCell>{item.datedOn ?? UNKNOWN}</DataCell>
-            <DataCell>{item.expiresOn ?? 'None'}</DataCell>
-            {showControl && <TableCell>{item.addedBy}</TableCell>}
-            <TableCell>
-              <StateBadge kind="evidence" state={item.state} />
-            </TableCell>
-            {canEdit && (
-              <TableCell className="py-0">
-                <RemoveEvidence item={item} />
-              </TableCell>
-            )}
-          </TableRow>
-        ))}
-        {items.length === 0 && (
-          <EmptyRow colSpan={(showControl ? 7 : 5) + (canEdit ? 1 : 0)}>No Evidence yet.</EmptyRow>
-        )}
-      </TableBody>
-    </Table>
+    <DataTable
+      columns={columns}
+      data={items}
+      getRowId={(item) => item.id}
+      // On an SoA entry the Evidence shares the URL with the entry's Tasks.
+      paramPrefix={showControl ? undefined : 'evidence-'}
+      searchLabel={showControl ? 'Search Evidence' : undefined}
+      emptyText="No Evidence yet."
+    />
   );
 }
